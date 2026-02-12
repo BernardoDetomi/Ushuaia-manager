@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Calendar, CheckCircle, Circle, User, Users } from 'lucide-react';
+import { Calendar, CheckCircle, Circle, User, Users, ArrowRightLeft } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 
 const MonthlyView = ({ expenses, settings }) => {
@@ -155,7 +155,26 @@ const MonthlyView = ({ expenses, settings }) => {
                 </div>
               </div>
 
-              {isExpanded && (
+              {isExpanded && (() => {
+                // Calculate settlement for this month
+                let p2OwesP1 = 0; // what person2 owes person1 (unpaid halves of person1's purchases)
+                let p1OwesP2 = 0; // what person1 owes person2 (unpaid halves of person2's purchases)
+
+                items.forEach((item) => {
+                  if (item.quem_pagou === 'person1' && !item.isPaidP2) {
+                    p2OwesP1 += item.halfAmount;
+                  }
+                  if (item.quem_pagou === 'person2' && !item.isPaidP1) {
+                    p1OwesP2 += item.halfAmount;
+                  }
+                });
+
+                const netAmount = Math.abs(p2OwesP1 - p1OwesP2);
+                const creditor = p2OwesP1 >= p1OwesP2 ? settings.person1 : settings.person2;
+                const debtor = p2OwesP1 >= p1OwesP2 ? settings.person2 : settings.person1;
+                const hasSettlement = netAmount > 0.01;
+
+                return (
                 <div className="bg-slate-900/50 border-t border-slate-700 divide-y divide-slate-700/50">
                   {items.map((item, idx) => {
                     const p1Key = `${item.installmentIndex}_person1`;
@@ -246,8 +265,68 @@ const MonthlyView = ({ expenses, settings }) => {
                       </div>
                     );
                   })}
+
+                  {/* Settlement / Acerto de contas */}
+                  <div className="p-4 bg-slate-900/80">
+                    <div className="rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/5 to-orange-500/5 p-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <ArrowRightLeft size={16} className="text-amber-400" />
+                        <span className="text-sm font-bold text-amber-300">Acerto do Mês</span>
+                      </div>
+
+                      <div className="space-y-2 text-xs">
+                        {p2OwesP1 > 0.01 && (
+                          <div className="flex justify-between text-slate-400">
+                            <span>{settings.person2} deve a {settings.person1} (parcelas)</span>
+                            <span className="text-white font-medium">{formatCurrency(p2OwesP1)}</span>
+                          </div>
+                        )}
+                        {p1OwesP2 > 0.01 && (
+                          <div className="flex justify-between text-slate-400">
+                            <span>{settings.person1} deve a {settings.person2} (parcelas)</span>
+                            <span className="text-white font-medium">{formatCurrency(p1OwesP2)}</span>
+                          </div>
+                        )}
+
+                        {(p2OwesP1 > 0.01 && p1OwesP2 > 0.01) && (
+                          <div className="border-t border-amber-500/20 pt-2 mt-2">
+                            <div className="flex justify-between text-slate-500 text-[11px] mb-1">
+                              <span>Desconto mútuo</span>
+                              <span>– {formatCurrency(Math.min(p2OwesP1, p1OwesP2))}</span>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+
+                      <div className="mt-3 pt-3 border-t border-amber-500/20">
+                        {hasSettlement ? (
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center">
+                                <ArrowRightLeft size={14} className="text-amber-400" />
+                              </div>
+                              <div>
+                                <div className="text-white text-sm font-bold">
+                                  {debtor} paga → {creditor}
+                                </div>
+                                <div className="text-[10px] text-slate-500">Valor líquido já descontado</div>
+                              </div>
+                            </div>
+                            <div className="text-lg font-bold text-amber-400">
+                              {formatCurrency(netAmount)}
+                            </div>
+                          </div>
+                        ) : (
+                          <div className="text-center text-teal-400 text-sm font-medium">
+                            ✓ Nenhum acerto pendente neste mês
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              )}
+                );
+              })()}
             </div>
           );
         })
