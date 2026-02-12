@@ -1,8 +1,8 @@
 import React, { useState } from 'react';
-import { Trash2, CreditCard } from 'lucide-react';
+import { Trash2, CreditCard, Pencil } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 
-const ExpenseList = ({ expenses, onDelete, settings }) => {
+const ExpenseList = ({ expenses, onDelete, onEdit, settings }) => {
   const [filter, setFilter] = useState('todos');
 
   const filteredExpenses = expenses.filter((exp) => {
@@ -77,13 +77,22 @@ const ExpenseList = ({ expenses, onDelete, settings }) => {
                     {formatCurrency(expense.valor_total)}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <button
-                      onClick={() => onDelete(expense.id)}
-                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5 rounded-full transition"
-                      title="Excluir"
-                    >
-                      <Trash2 size={16} />
-                    </button>
+                    <div className="flex items-center justify-center gap-1">
+                      <button
+                        onClick={() => onEdit(expense)}
+                        className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 p-1.5 rounded-full transition"
+                        title="Editar"
+                      >
+                        <Pencil size={16} />
+                      </button>
+                      <button
+                        onClick={() => onDelete(expense.id)}
+                        className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5 rounded-full transition"
+                        title="Excluir"
+                      >
+                        <Trash2 size={16} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))

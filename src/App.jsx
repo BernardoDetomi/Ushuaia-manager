@@ -29,6 +29,7 @@ export default function App() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
   const [showForm, setShowForm] = useState(false);
+  const [editingExpense, setEditingExpense] = useState(null);
   const [showActivityForm, setShowActivityForm] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [activeTab, setActiveTab] = useState('dashboard');
@@ -213,7 +214,7 @@ export default function App() {
           <div>
             <SummaryCards expenses={expenses} settings={settings} />
             <ChartsSection expenses={expenses} settings={settings} />
-            <ExpenseList expenses={expenses} onDelete={handleDelete} settings={settings} />
+            <ExpenseList expenses={expenses} onDelete={handleDelete} onEdit={(exp) => { setEditingExpense(exp); setShowForm(true); }} settings={settings} />
           </div>
         )}
         {activeTab === 'monthly' && (
@@ -229,7 +230,7 @@ export default function App() {
       </main>
 
       {/* Modals */}
-      {showForm && <ExpenseForm onClose={() => setShowForm(false)} settings={settings} />}
+      {showForm && <ExpenseForm onClose={() => { setShowForm(false); setEditingExpense(null); }} settings={settings} editingExpense={editingExpense} />}
       {showActivityForm && <ActivityForm onClose={() => setShowActivityForm(false)} />}
       {showSettings && (
         <SettingsModal

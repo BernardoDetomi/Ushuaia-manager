@@ -1,20 +1,24 @@
 import React, { useState } from 'react';
-import { collection, addDoc } from 'firebase/firestore';
+import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Plus } from 'lucide-react';
+import { Plus, Pencil } from 'lucide-react';
 
-const ExpenseForm = ({ onClose, settings }) => {
+const ExpenseForm = ({ onClose, settings, editingExpense }) => {
+  const isEditing = !!editingExpense;
+  const todayStr = new Date().toISOString().split('T')[0];
+
   const [formData, setFormData] = useState({
-    description: '',
-    category: 'Alimentação',
-    value: '',
-    payer: 'person1',
-    method: 'Cartão de Crédito',
-    cardName: '',
-    cardDueDate: '',
-    isInstallment: false,
-    installmentsCount: 2,
-    firstInstallmentValue: '',
+    description: editingExpense?.descricao || '',
+    category: editingExpense?.categoria || 'Alimentação',
+    value: editingExpense?.valor_total?.toString() || '',
+    payer: editingExpense?.quem_pagou || 'person1',
+    method: editingExpense?.forma_pagamento || 'Cartão de Crédito',
+    cardName: editingExpense?.nome_cartao || '',
+    cardDueDate: editingExpense?.dia_vencimento?.toString() || '',
+    purchaseDate: editingExpense ? (editingExpense.data?.split('T')[0] || todayStr) : todayStr,
+    isInstallment: editingExpense?.parcelado || false,
+    installmentsCount: editingExpense?.detalhes_parcela?.count?.toString() || '2',
+    firstInstallmentValue: editingExpense?.detalhes_parcela?.firstValue?.toString() || '',
   });
 
   const handleSubmit = async (e) => {
@@ -40,7 +44,7 @@ const ExpenseForm = ({ onClose, settings }) => {
         }
       }
 
-      await addDoc(collection(db, 'expenses'), {
+      const expenseData = {
         descricao: formData.description,
         categoria: formData.category,
         valor_total: finalValue,
@@ -51,9 +55,17 @@ const ExpenseForm = ({ onClose, settings }) => {
           formData.method === 'Cartão de Crédito' ? parseInt(formData.cardDueDate) : null,
         parcelado: formData.isInstallment,
         detalhes_parcela: installmentDetails,
-        parcelas_pagas: [],
-        data: new Date().toISOString(),
-      });
+        data: new Date(formData.purchaseDate + 'T12:00:00').toISOString(),
+      };
+
+      if (isEditing) {
+        await updateDoc(doc(db, 'expenses', editingExpense.id), expenseData);
+      } else {
+        await addDoc(collection(db, 'expenses'), {
+          ...expenseData,
+          parcelas_pagas: [],
+        });
+      }
 
       onClose();
     } catch (error) {
@@ -67,7 +79,11 @@ const ExpenseForm = ({ onClose, settings }) => {
       <div className="bg-slate-800 rounded-2xl w-full max-w-2xl border border-slate-700 shadow-2xl overflow-y-auto max-h-[90vh]">
         <div className="p-6 border-b border-slate-700 flex justify-between items-center">
           <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            <Plus className="text-teal-400" /> Novo Gasto
+            {isEditing ? (
+              <><Pencil className="text-yellow-400" /> Editar Gasto</>
+            ) : (
+              <><Plus className="text-teal-400" /> Novo Gasto</>
+            )}
           </h2>
           <button onClick={onClose} className="text-slate-400 hover:text-white">
             ✕
@@ -101,6 +117,16 @@ const ExpenseForm = ({ onClose, settings }) => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Data da Compra</label>
+              <input
+                type="date"
+                required
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
+                value={formData.purchaseDate}
+                onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
+              />
+            </div>
             <div>
               <label className="block text-sm text-slate-400 mb-1">Categoria</label>
               <select
@@ -250,9 +276,13 @@ const ExpenseForm = ({ onClose, settings }) => {
             </button>
             <button
               type="submit"
-              className="flex-1 bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 rounded-lg transition shadow-lg shadow-teal-900/50"
+              className={`flex-1 font-bold py-3 rounded-lg transition shadow-lg text-white ${
+                isEditing
+                  ? 'bg-yellow-600 hover:bg-yellow-500 shadow-yellow-900/50'
+                  : 'bg-teal-600 hover:bg-teal-500 shadow-teal-900/50'
+              }`}
             >
-              Adicionar
+              {isEditing ? 'Salvar Alterações' : 'Adicionar'}
             </button>
           </div>
         </form>
