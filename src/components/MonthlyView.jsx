@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
-import { Calendar, CheckCircle, Circle } from 'lucide-react';
+import { Calendar, CheckCircle, Circle, User, Users } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 
 const MonthlyView = ({ expenses, settings }) => {
@@ -11,18 +11,18 @@ const MonthlyView = ({ expenses, settings }) => {
     setExpandedMonths((prev) => ({ ...prev, [monthKey]: !prev[monthKey] }));
   };
 
-  const togglePayment = async (expenseId, installmentIndex, currentPaidList) => {
-    const isPaid = currentPaidList.includes(installmentIndex);
-    let newPaidList;
-    if (isPaid) {
-      newPaidList = currentPaidList.filter((i) => i !== installmentIndex);
+  const togglePayment = async (expenseId, key, currentPaidMap) => {
+    // key format: "installmentIndex_person1" or "installmentIndex_person2"
+    const newPaidMap = { ...currentPaidMap };
+    if (newPaidMap[key]) {
+      delete newPaidMap[key];
     } else {
-      newPaidList = [...currentPaidList, installmentIndex];
+      newPaidMap[key] = true;
     }
 
     try {
       const docRef = doc(db, 'expenses', expenseId);
-      await updateDoc(docRef, { parcelas_pagas: newPaidList });
+      await updateDoc(docRef, { parcelas_pagas_v2: newPaidMap });
     } catch (err) {
       console.error('Error updating payment:', err);
     }
@@ -67,18 +67,30 @@ const MonthlyView = ({ expenses, settings }) => {
 
         if (!data[monthKey]) data[monthKey] = { items: [], total: 0, pending: 0 };
 
-        const isPaid = expense.parcelas_pagas?.includes(i);
+        const halfAmount = amount / 2;
+        // Support both old (parcelas_pagas array) and new (parcelas_pagas_v2 map) format
+        const paidMap = expense.parcelas_pagas_v2 || {};
+        // Migrate old format: if old array has this index, treat both halves as paid
+        const oldPaidList = expense.parcelas_pagas || [];
+        const p1Key = `${i}_person1`;
+        const p2Key = `${i}_person2`;
+        const isPaidP1 = paidMap[p1Key] || (!expense.parcelas_pagas_v2 && oldPaidList.includes(i));
+        const isPaidP2 = paidMap[p2Key] || (!expense.parcelas_pagas_v2 && oldPaidList.includes(i));
 
         data[monthKey].items.push({
           ...expense,
           installmentIndex: i,
           installmentAmount: amount,
-          isPaid,
+          halfAmount,
+          isPaidP1,
+          isPaidP2,
+          paidMap,
           installmentLabel: expense.parcelado ? `${i + 1}/${count}` : 'À vista',
         });
 
         data[monthKey].total += amount;
-        if (!isPaid) data[monthKey].pending += amount;
+        if (!isPaidP1) data[monthKey].pending += halfAmount;
+        if (!isPaidP2) data[monthKey].pending += halfAmount;
       }
     });
 
@@ -145,52 +157,95 @@ const MonthlyView = ({ expenses, settings }) => {
 
               {isExpanded && (
                 <div className="bg-slate-900/50 border-t border-slate-700 divide-y divide-slate-700/50">
-                  {items.map((item, idx) => (
-                    <div
-                      key={`${item.id}-${idx}`}
-                      className="p-4 flex items-center justify-between hover:bg-slate-800/50"
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className="text-white font-medium">{item.descricao}</span>
-                          <span className="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300">
-                            {item.installmentLabel}
-                          </span>
-                        </div>
-                        <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
-                          <span>
-                            {item.quem_pagou === 'person1' ? settings.person1 : settings.person2}
-                          </span>
-                          <span>&bull;</span>
-                          <span>{item.nome_cartao || item.forma_pagamento}</span>
-                        </div>
-                      </div>
+                  {items.map((item, idx) => {
+                    const p1Key = `${item.installmentIndex}_person1`;
+                    const p2Key = `${item.installmentIndex}_person2`;
+                    const bothPaid = item.isPaidP1 && item.isPaidP2;
 
-                      <div className="flex items-center gap-4">
-                        <span className="text-white font-bold">
-                          {formatCurrency(item.installmentAmount)}
-                        </span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            togglePayment(
-                              item.id,
-                              item.installmentIndex,
-                              item.parcelas_pagas || []
-                            );
-                          }}
-                          className={`p-2 rounded-full transition ${
-                            item.isPaid
-                              ? 'text-teal-400 bg-teal-400/10 hover:bg-teal-400/20'
-                              : 'text-slate-500 hover:text-white hover:bg-slate-700'
-                          }`}
-                          title={item.isPaid ? 'Pago' : 'Marcar como Pago'}
-                        >
-                          {item.isPaid ? <CheckCircle size={20} /> : <Circle size={20} />}
-                        </button>
+                    return (
+                      <div
+                        key={`${item.id}-${idx}`}
+                        className={`p-4 hover:bg-slate-800/50 ${bothPaid ? 'opacity-50' : ''}`}
+                      >
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-2">
+                              <span className="text-white font-medium">{item.descricao}</span>
+                              <span className="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300">
+                                {item.installmentLabel}
+                              </span>
+                            </div>
+                            <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                              <span>
+                                {item.quem_pagou === 'person1' ? settings.person1 : settings.person2}
+                              </span>
+                              <span>&bull;</span>
+                              <span>{item.nome_cartao || item.forma_pagamento}</span>
+                              {item.dia_vencimento && (
+                                <>
+                                  <span>&bull;</span>
+                                  <span className="text-orange-400">Venc. dia {item.dia_vencimento}</span>
+                                </>
+                              )}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-white font-bold text-sm">
+                              {formatCurrency(item.installmentAmount)}
+                            </span>
+                            <div className="text-[10px] text-slate-500">
+                              {formatCurrency(item.halfAmount)} / pessoa
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Per-person payment toggles */}
+                        <div className="flex gap-2 mt-2">
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              togglePayment(item.id, p1Key, item.paidMap);
+                            }}
+                            className={`flex-1 flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition border ${
+                              item.isPaidP1
+                                ? 'border-teal-500/30 bg-teal-500/10 text-teal-300'
+                                : 'border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-500'
+                            }`}
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <User size={14} />
+                              {settings.person1}
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              {formatCurrency(item.halfAmount)}
+                              {item.isPaidP1 ? <CheckCircle size={16} /> : <Circle size={16} />}
+                            </span>
+                          </button>
+
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              togglePayment(item.id, p2Key, item.paidMap);
+                            }}
+                            className={`flex-1 flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition border ${
+                              item.isPaidP2
+                                ? 'border-purple-500/30 bg-purple-500/10 text-purple-300'
+                                : 'border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-500'
+                            }`}
+                          >
+                            <span className="flex items-center gap-1.5">
+                              <Users size={14} />
+                              {settings.person2}
+                            </span>
+                            <span className="flex items-center gap-1.5">
+                              {formatCurrency(item.halfAmount)}
+                              {item.isPaidP2 ? <CheckCircle size={16} /> : <Circle size={16} />}
+                            </span>
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
             </div>
