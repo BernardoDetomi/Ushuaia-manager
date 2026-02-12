@@ -1,6 +1,6 @@
 import React from 'react';
 import { doc, updateDoc, deleteDoc } from 'firebase/firestore';
-import { db, appId } from '../config/firebase';
+import { db } from '../config/firebase';
 import { MapPin, Trash2, ExternalLink, Clock, CheckCircle, Bookmark } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 
@@ -19,7 +19,7 @@ const PRIORITY_CONFIG = {
 const ActivitiesList = ({ activities }) => {
   const handleStatusChange = async (activityId, newStatus) => {
     try {
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'activities', activityId);
+      const docRef = doc(db, 'activities', activityId);
       await updateDoc(docRef, { status: newStatus });
     } catch (err) {
       console.error('Erro ao atualizar status:', err);
@@ -28,7 +28,7 @@ const ActivitiesList = ({ activities }) => {
 
   const handleDelete = async (id) => {
     if (confirm('Tem certeza que deseja excluir este passeio?')) {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'activities', id));
+      await deleteDoc(doc(db, 'activities', id));
     }
   };
 

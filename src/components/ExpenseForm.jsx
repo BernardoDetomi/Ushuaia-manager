@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
-import { db, appId } from '../config/firebase';
+import { db } from '../config/firebase';
 import { Plus } from 'lucide-react';
 
 const ExpenseForm = ({ onClose, settings }) => {
@@ -40,7 +40,7 @@ const ExpenseForm = ({ onClose, settings }) => {
         }
       }
 
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), {
+      await addDoc(collection(db, 'expenses'), {
         descricao: formData.description,
         categoria: formData.category,
         valor_total: finalValue,

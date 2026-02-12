@@ -1,6 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { doc, updateDoc } from 'firebase/firestore';
-import { db, appId } from '../config/firebase';
+import { db } from '../config/firebase';
 import { Calendar, CheckCircle, Circle } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 
@@ -21,7 +21,7 @@ const MonthlyView = ({ expenses, settings }) => {
     }
 
     try {
-      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'expenses', expenseId);
+      const docRef = doc(db, 'expenses', expenseId);
       await updateDoc(docRef, { parcelas_pagas: newPaidList });
     } catch (err) {
       console.error('Error updating payment:', err);

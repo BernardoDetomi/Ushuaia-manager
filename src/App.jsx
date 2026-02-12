@@ -9,7 +9,7 @@ import {
   doc,
   setDoc,
 } from 'firebase/firestore';
-import { auth, db, appId } from './config/firebase';
+import { auth, db } from './config/firebase';
 import { Plus, MapPin } from 'lucide-react';
 
 import AuthScreen from './components/AuthScreen';
@@ -23,6 +23,7 @@ import ExpenseForm from './components/ExpenseForm';
 import SettingsModal from './components/SettingsModal';
 import ActivitiesList from './components/ActivitiesList';
 import ActivityForm from './components/ActivityForm';
+import PendingApproval from './components/PendingApproval';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -34,11 +35,13 @@ export default function App() {
   const [expenses, setExpenses] = useState([]);
   const [activities, setActivities] = useState([]);
   const [settings, setSettings] = useState({ person1: 'Eu', person2: 'Namorada' });
+  const [isApproved, setIsApproved] = useState(null); // null = loading, true/false
 
   // Auth Listener
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
       setUser(currentUser);
+      if (!currentUser) setIsApproved(null);
       setLoading(false);
     });
     return () => unsubscribe();
@@ -49,12 +52,29 @@ export default function App() {
     if (!user) {
       setExpenses([]);
       setActivities([]);
+      setIsApproved(null);
       return;
     }
 
+    // Check user approval status
+    const userDocRef = doc(db, 'users', user.uid);
+    const unsubUser = onSnapshot(userDocRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setIsApproved(docSnap.data().approved === true);
+      } else {
+        // User doc doesn't exist (old user before approval system) — auto-approve
+        setDoc(userDocRef, {
+          email: user.email,
+          approved: true,
+          createdAt: new Date().toISOString(),
+        });
+        setIsApproved(true);
+      }
+    });
+
     // Usando coleção pública para compartilhar dados entre contas diferentes
     const expenseQuery = query(
-      collection(db, 'artifacts', appId, 'public', 'data', 'expenses'),
+      collection(db, 'expenses'),
       orderBy('data', 'desc')
     );
 
@@ -65,7 +85,7 @@ export default function App() {
 
     // Load Activities
     const activitiesQuery = query(
-      collection(db, 'artifacts', appId, 'public', 'data', 'activities'),
+      collection(db, 'activities'),
       orderBy('criado_em', 'desc')
     );
 
@@ -75,7 +95,7 @@ export default function App() {
     });
 
     // Load Settings
-    const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config');
+    const settingsRef = doc(db, 'settings', 'config');
     const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
       if (docSnap.exists()) {
         setSettings(docSnap.data());
@@ -85,6 +105,7 @@ export default function App() {
     });
 
     return () => {
+      unsubUser();
       unsubExpenses();
       unsubActivities();
       unsubSettings();
@@ -93,14 +114,14 @@ export default function App() {
 
   const saveSettings = async (newSettings) => {
     await setDoc(
-      doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config'),
+      doc(db, 'settings', 'config'),
       newSettings
     );
   };
 
   const handleDelete = async (id) => {
     if (confirm('Tem certeza que deseja excluir este gasto?')) {
-      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', id));
+      await deleteDoc(doc(db, 'expenses', id));
     }
   };
 
@@ -115,6 +136,17 @@ export default function App() {
   }
 
   if (!user) return <AuthScreen />;
+
+  if (isApproved === null || isApproved === false) {
+    if (isApproved === null) {
+      return (
+        <div className="min-h-screen bg-slate-900 flex items-center justify-center text-teal-500">
+          Verificando acesso...
+        </div>
+      );
+    }
+    return <PendingApproval />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 pb-12 font-sans">

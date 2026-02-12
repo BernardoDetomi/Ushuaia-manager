@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { collection, addDoc } from 'firebase/firestore';
-import { db, appId } from '../config/firebase';
+import { db } from '../config/firebase';
 import { MapPin } from 'lucide-react';
 
 const ActivityForm = ({ onClose }) => {
@@ -18,7 +18,7 @@ const ActivityForm = ({ onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'activities'), {
+      await addDoc(collection(db, 'activities'), {
         nome: formData.name,
         descricao: formData.description,
         custo_estimado: formData.estimatedCost ? parseFloat(formData.estimatedCost) : 0,

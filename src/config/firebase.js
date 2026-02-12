@@ -14,6 +14,3 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 export const auth = getAuth(app);
 export const db = getFirestore(app);
-
-// App ID for Firestore collection paths
-export const appId = import.meta.env.VITE_FIREBASE_APP_ID || 'default-app-id';

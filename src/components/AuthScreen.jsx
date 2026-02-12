@@ -3,7 +3,8 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
 } from 'firebase/auth';
-import { auth } from '../config/firebase';
+import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
+import { auth, db } from '../config/firebase';
 import { Snowflake, AlertCircle } from 'lucide-react';
 
 const AuthScreen = () => {
@@ -21,7 +22,16 @@ const AuthScreen = () => {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+        // Check if this is the first user (auto-approve)
+        const usersSnap = await getDocs(collection(db, 'users'));
+        const isFirstUser = usersSnap.empty;
+        // Register user doc
+        await setDoc(doc(db, 'users', userCredential.user.uid), {
+          email: userCredential.user.email,
+          approved: isFirstUser,
+          createdAt: new Date().toISOString(),
+        });
       }
     } catch (err) {
       setError(
