@@ -1,0 +1,1032 @@
+import React, { useState, useEffect, useMemo } from 'react';
+import { 
+  initializeApp 
+} from 'firebase/app';
+import { 
+  getAuth, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut, 
+  onAuthStateChanged,
+  signInWithCustomToken,
+  signInAnonymously
+} from 'firebase/auth';
+import { 
+  getFirestore, 
+  collection, 
+  addDoc, 
+  query, 
+  orderBy, 
+  onSnapshot, 
+  deleteDoc, 
+  doc, 
+  updateDoc,
+  setDoc,
+  getDoc
+} from 'firebase/firestore';
+import { 
+  PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Tooltip, Legend 
+} from 'recharts';
+import { 
+  Wallet, Plane, Calendar, Plus, Trash2, LogOut, 
+  CreditCard, User, Users, DollarSign, TrendingUp, 
+  Snowflake, MapPin, AlertCircle, Settings, CheckCircle, Circle
+} from 'lucide-react';
+
+// --- Configuração do Firebase ---
+const firebaseConfig = JSON.parse(__firebase_config);
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+const appId = typeof __app_id !== 'undefined' ? __app_id : 'default-app-id';
+
+// --- Utilitários ---
+const formatCurrency = (value) => {
+  return new Intl.NumberFormat('pt-BR', {
+    style: 'currency',
+    currency: 'BRL'
+  }).format(value);
+};
+
+const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042', '#AF19FF', '#F05252'];
+
+// --- Componente de Login/Registro ---
+const AuthScreen = ({ setUser }) => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+
+  const handleAuth = async (e) => {
+    e.preventDefault();
+    setLoading(true);
+    setError('');
+    try {
+      if (isLogin) {
+        await signInWithEmailAndPassword(auth, email, password);
+      } else {
+        await createUserWithEmailAndPassword(auth, email, password);
+      }
+    } catch (err) {
+      setError(err.message.includes('auth/invalid-credential') 
+        ? 'E-mail ou senha incorretos.' 
+        : 'Erro ao autenticar. Tente novamente.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4">
+      <div className="bg-slate-800 p-8 rounded-2xl shadow-2xl w-full max-w-md border border-slate-700">
+        <div className="text-center mb-8">
+          <div className="flex justify-center mb-4">
+            <div className="bg-teal-500/20 p-4 rounded-full">
+              <Snowflake className="w-10 h-10 text-teal-400" />
+            </div>
+          </div>
+          <h1 className="text-3xl font-bold text-white mb-2">Ushuaia 2026</h1>
+          <p className="text-slate-400">Controle Financeiro Compartilhado</p>
+        </div>
+
+        <form onSubmit={handleAuth} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Email</label>
+            <input 
+              type="email" 
+              required
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-teal-500 outline-none transition"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-slate-300 mb-1">Senha</label>
+            <input 
+              type="password" 
+              required
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:ring-2 focus:ring-teal-500 outline-none transition"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </div>
+
+          {error && (
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-lg flex items-center gap-2 text-red-400 text-sm">
+              <AlertCircle size={16} />
+              {error}
+            </div>
+          )}
+
+          <button 
+            type="submit" 
+            disabled={loading}
+            className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 rounded-lg transition-all shadow-lg shadow-teal-900/50 disabled:opacity-50"
+          >
+            {loading ? 'Processando...' : (isLogin ? 'Entrar' : 'Criar Conta')}
+          </button>
+        </form>
+
+        <div className="mt-6 text-center">
+          <button 
+            onClick={() => setIsLogin(!isLogin)}
+            className="text-teal-400 hover:text-teal-300 text-sm font-medium transition"
+          >
+            {isLogin ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entre'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Configurações de Nomes ---
+const SettingsModal = ({ onClose, settings, onSave }) => {
+  const [names, setNames] = useState(settings || { person1: 'Eu', person2: 'Ela' });
+
+  const handleSave = () => {
+    onSave(names);
+    onClose();
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 rounded-2xl w-full max-w-md border border-slate-700 p-6">
+        <h2 className="text-xl font-bold text-white mb-4 flex items-center gap-2">
+          <Settings className="text-teal-400" /> Configurar Nomes
+        </h2>
+        <div className="space-y-4">
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Nome da Pessoa 1 (Você)</label>
+            <input 
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
+              value={names.person1}
+              onChange={e => setNames({...names, person1: e.target.value})}
+            />
+          </div>
+          <div>
+            <label className="block text-sm text-slate-400 mb-1">Nome da Pessoa 2 (Parceiro/a)</label>
+            <input 
+              className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
+              value={names.person2}
+              onChange={e => setNames({...names, person2: e.target.value})}
+            />
+          </div>
+          <button 
+            onClick={handleSave}
+            className="w-full bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 rounded-lg mt-4 transition"
+          >
+            Salvar Configurações
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Dashboard Components ---
+
+const Countdown = () => {
+  const [timeLeft, setTimeLeft] = useState({ days: 0, hours: 0, minutes: 0 });
+
+  useEffect(() => {
+    const targetDate = new Date('2026-08-16T00:00:00'); 
+    
+    const calculateTime = () => {
+      const now = new Date();
+      const difference = targetDate - now;
+
+      if (difference > 0) {
+        setTimeLeft({
+          days: Math.floor(difference / (1000 * 60 * 60 * 24)),
+          hours: Math.floor((difference / (1000 * 60 * 60)) % 24),
+          minutes: Math.floor((difference / 1000 / 60) % 60),
+        });
+      }
+    };
+
+    calculateTime();
+    const timer = setInterval(calculateTime, 60000);
+    return () => clearInterval(timer);
+  }, []);
+
+  return (
+    <div className="bg-gradient-to-r from-blue-900 to-slate-900 rounded-xl p-6 shadow-lg border border-blue-800/50 text-white relative overflow-hidden mb-6">
+      <div className="absolute right-0 top-0 opacity-10">
+        <MapPin size={120} />
+      </div>
+      <div className="relative z-10 flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>
+          <h2 className="text-2xl font-bold flex items-center gap-2">
+            <Plane className="text-teal-400" /> Rumo a Ushuaia
+          </h2>
+          <p className="text-blue-200">16 de Agosto - O Fim do Mundo</p>
+        </div>
+        <div className="flex gap-4 text-center">
+          <div className="bg-slate-800/50 p-3 rounded-lg min-w-[80px] backdrop-blur-sm">
+            <span className="block text-3xl font-bold text-teal-400">{timeLeft.days}</span>
+            <span className="text-xs text-slate-400 uppercase tracking-wider">Dias</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const SummaryCards = ({ expenses, settings }) => {
+  const summary = useMemo(() => {
+    let total = 0;
+    let paidByMe = 0;
+    let paidByHer = 0;
+
+    expenses.forEach(exp => {
+      const val = parseFloat(exp.valor_total);
+      total += val;
+      if (exp.quem_pagou === 'person1') paidByMe += val;
+      else paidByHer += val;
+    });
+
+    const halfTotal = total / 2;
+    const myBalance = paidByMe - halfTotal; 
+
+    return { total, paidByMe, paidByHer, myBalance };
+  }, [expenses]);
+
+  return (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+      <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-sm">
+        <div className="flex justify-between items-start mb-2">
+          <div className="p-2 bg-blue-500/20 rounded-lg">
+            <Wallet className="text-blue-400" size={20} />
+          </div>
+          <span className="text-xs text-slate-400 bg-slate-700 px-2 py-1 rounded">Total</span>
+        </div>
+        <h3 className="text-2xl font-bold text-white">{formatCurrency(summary.total)}</h3>
+        <p className="text-sm text-slate-400 mt-1">Custo total da viagem</p>
+      </div>
+
+      <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-sm">
+        <div className="flex justify-between items-start mb-2">
+          <div className="p-2 bg-teal-500/20 rounded-lg">
+            <User className="text-teal-400" size={20} />
+          </div>
+          <span className="text-xs text-slate-400 bg-slate-700 px-2 py-1 rounded truncate max-w-[120px]">{settings.person1} pagou</span>
+        </div>
+        <h3 className="text-2xl font-bold text-white">{formatCurrency(summary.paidByMe)}</h3>
+      </div>
+
+      <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-sm">
+        <div className="flex justify-between items-start mb-2">
+          <div className="p-2 bg-purple-500/20 rounded-lg">
+            <Users className="text-purple-400" size={20} />
+          </div>
+          <span className="text-xs text-slate-400 bg-slate-700 px-2 py-1 rounded truncate max-w-[120px]">{settings.person2} pagou</span>
+        </div>
+        <h3 className="text-2xl font-bold text-white">{formatCurrency(summary.paidByHer)}</h3>
+      </div>
+
+      <div className={`bg-slate-800 p-5 rounded-xl border shadow-sm ${summary.myBalance >= 0 ? 'border-teal-500/50' : 'border-red-500/50'}`}>
+        <div className="flex justify-between items-start mb-2">
+          <div className={`p-2 rounded-lg ${summary.myBalance >= 0 ? 'bg-teal-500/20' : 'bg-red-500/20'}`}>
+            <TrendingUp className={summary.myBalance >= 0 ? 'text-teal-400' : 'text-red-400'} size={20} />
+          </div>
+          <span className="text-xs text-slate-400 bg-slate-700 px-2 py-1 rounded">Acerto</span>
+        </div>
+        <h3 className={`text-2xl font-bold ${summary.myBalance >= 0 ? 'text-teal-400' : 'text-red-400'}`}>
+          {formatCurrency(Math.abs(summary.myBalance))}
+        </h3>
+        <p className="text-sm text-slate-300 mt-1 truncate">
+          {summary.myBalance === 0 
+            ? 'Tudo quitado!' 
+            : summary.myBalance > 0 
+              ? `${settings.person2} deve` 
+              : `${settings.person1} deve`}
+        </p>
+      </div>
+    </div>
+  );
+};
+
+const ExpenseForm = ({ onClose, settings }) => {
+  const [formData, setFormData] = useState({
+    description: '',
+    category: 'Alimentação',
+    value: '',
+    payer: 'person1',
+    method: 'Cartão de Crédito',
+    cardName: '',
+    cardDueDate: '',
+    isInstallment: false,
+    installmentsCount: 2,
+    firstInstallmentValue: '',
+  });
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      let finalValue = parseFloat(formData.value);
+      let installmentDetails = null;
+
+      if (formData.isInstallment) {
+        if (formData.firstInstallmentValue) {
+          installmentDetails = {
+            count: parseInt(formData.installmentsCount),
+            firstValue: parseFloat(formData.firstInstallmentValue),
+            remainingValue: (finalValue - parseFloat(formData.firstInstallmentValue)) / (parseInt(formData.installmentsCount) - 1)
+          };
+        } else {
+          installmentDetails = {
+            count: parseInt(formData.installmentsCount),
+            valuePerMonth: finalValue / parseInt(formData.installmentsCount)
+          };
+        }
+      }
+
+      await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'expenses'), {
+        descricao: formData.description,
+        categoria: formData.category,
+        valor_total: finalValue,
+        quem_pagou: formData.payer,
+        forma_pagamento: formData.method,
+        nome_cartao: formData.cardName,
+        dia_vencimento: formData.method === 'Cartão de Crédito' ? parseInt(formData.cardDueDate) : null,
+        parcelado: formData.isInstallment,
+        detalhes_parcela: installmentDetails,
+        parcelas_pagas: [], // Array de índices de parcelas pagas (0, 1, 2...)
+        data: new Date().toISOString()
+      });
+
+      onClose();
+    } catch (error) {
+      console.error("Erro ao salvar:", error);
+      alert("Erro ao salvar gasto.");
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+      <div className="bg-slate-800 rounded-2xl w-full max-w-2xl border border-slate-700 shadow-2xl overflow-y-auto max-h-[90vh]">
+        <div className="p-6 border-b border-slate-700 flex justify-between items-center">
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">
+            <Plus className="text-teal-400" /> Novo Gasto
+          </h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+        </div>
+        
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Descrição</label>
+              <input 
+                required 
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
+                placeholder="Ex: Jantar no El Viejo Marino"
+                value={formData.description}
+                onChange={e => setFormData({...formData, description: e.target.value})}
+              />
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Valor Total (R$)</label>
+              <input 
+                type="number" 
+                step="0.01" 
+                required 
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
+                placeholder="0.00"
+                value={formData.value}
+                onChange={e => setFormData({...formData, value: e.target.value})}
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Categoria</label>
+              <select 
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
+                value={formData.category}
+                onChange={e => setFormData({...formData, category: e.target.value})}
+              >
+                <option>Passagem</option>
+                <option>Hospedagem</option>
+                <option>Alimentação</option>
+                <option>Passeios</option>
+                <option>Transporte</option>
+                <option>Presentes</option>
+                <option>Outros</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Quem Pagou?</label>
+              <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700">
+                <button
+                  type="button"
+                  onClick={() => setFormData({...formData, payer: 'person1'})}
+                  className={`flex-1 py-2 rounded-md text-sm font-medium transition ${formData.payer === 'person1' ? 'bg-teal-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  {settings.person1}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormData({...formData, payer: 'person2'})}
+                  className={`flex-1 py-2 rounded-md text-sm font-medium transition ${formData.payer === 'person2' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                >
+                  {settings.person2}
+                </button>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm text-slate-400 mb-1">Forma de Pagamento</label>
+              <select 
+                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
+                value={formData.method}
+                onChange={e => setFormData({...formData, method: e.target.value})}
+              >
+                <option>Cartão de Crédito</option>
+                <option>Cartão de Débito</option>
+                <option>Pix</option>
+                <option>Dinheiro</option>
+                <option>Wise/Nomad</option>
+              </select>
+            </div>
+            {formData.method === 'Cartão de Crédito' && (
+               <>
+                 <div>
+                   <label className="block text-sm text-slate-400 mb-1">Apelido do Cartão</label>
+                   <input 
+                     className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
+                     placeholder="Ex: Nubank Roxo"
+                     value={formData.cardName}
+                     onChange={e => setFormData({...formData, cardName: e.target.value})}
+                   />
+                 </div>
+                 <div className="col-span-1 md:col-span-2">
+                   <label className="block text-sm text-slate-400 mb-1">Dia de Vencimento da Fatura</label>
+                   <input 
+                     type="number" 
+                     min="1" 
+                     max="31"
+                     className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
+                     placeholder="Ex: 5"
+                     value={formData.cardDueDate}
+                     onChange={e => setFormData({...formData, cardDueDate: e.target.value})}
+                   />
+                   <p className="text-xs text-slate-500 mt-1">Usado para calcular em qual mês cai a primeira parcela.</p>
+                 </div>
+               </>
+            )}
+          </div>
+
+          <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
+            <div className="flex items-center gap-3 mb-4">
+              <input 
+                type="checkbox" 
+                id="parcelado"
+                className="w-5 h-5 accent-teal-500"
+                checked={formData.isInstallment}
+                onChange={e => setFormData({...formData, isInstallment: e.target.checked})}
+              />
+              <label htmlFor="parcelado" className="text-white font-medium cursor-pointer">Compra Parcelada?</label>
+            </div>
+
+            {formData.isInstallment && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 animate-in slide-in-from-top-2 duration-300">
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Nº Parcelas</label>
+                  <input 
+                    type="number" 
+                    min="2"
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
+                    value={formData.installmentsCount}
+                    onChange={e => setFormData({...formData, installmentsCount: e.target.value})}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm text-slate-400 mb-1">Valor da 1ª Parcela (Opcional)</label>
+                  <input 
+                    type="number" 
+                    step="0.01"
+                    className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
+                    placeholder="Se diferente das outras"
+                    value={formData.firstInstallmentValue}
+                    onChange={e => setFormData({...formData, firstInstallmentValue: e.target.value})}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <div className="pt-4 flex gap-3">
+            <button 
+              type="button" 
+              onClick={onClose}
+              className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-medium py-3 rounded-lg transition"
+            >
+              Cancelar
+            </button>
+            <button 
+              type="submit" 
+              className="flex-1 bg-teal-600 hover:bg-teal-500 text-white font-bold py-3 rounded-lg transition shadow-lg shadow-teal-900/50"
+            >
+              Adicionar
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+};
+
+const MonthlyView = ({ expenses, settings }) => {
+  const [expandedMonths, setExpandedMonths] = useState({});
+
+  const toggleMonth = (monthKey) => {
+    setExpandedMonths(prev => ({...prev, [monthKey]: !prev[monthKey]}));
+  };
+
+  const togglePayment = async (expenseId, installmentIndex, currentPaidList) => {
+    const isPaid = currentPaidList.includes(installmentIndex);
+    let newPaidList;
+    if (isPaid) {
+      newPaidList = currentPaidList.filter(i => i !== installmentIndex);
+    } else {
+      newPaidList = [...currentPaidList, installmentIndex];
+    }
+
+    try {
+      const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'expenses', expenseId);
+      await updateDoc(docRef, { parcelas_pagas: newPaidList });
+    } catch (err) {
+      console.error("Error updating payment:", err);
+    }
+  };
+
+  const monthlyData = useMemo(() => {
+    const data = {};
+
+    expenses.forEach(expense => {
+      const expenseDate = new Date(expense.data);
+      let startMonth = expenseDate.getMonth();
+      let startYear = expenseDate.getFullYear();
+
+      // Ajuste de fatura: se comprou depois do dia de vencimento, joga pro próximo mês
+      if (expense.forma_pagamento === 'Cartão de Crédito' && expense.dia_vencimento) {
+        if (expenseDate.getDate() >= expense.dia_vencimento) {
+          startMonth++;
+        }
+      }
+
+      const count = expense.parcelado ? (expense.detalhes_parcela?.count || 1) : 1;
+
+      for (let i = 0; i < count; i++) {
+        let currentMonth = startMonth + i;
+        let year = startYear + Math.floor(currentMonth / 12);
+        let month = currentMonth % 12;
+
+        const monthKey = `${year}-${month}`;
+        
+        let amount = 0;
+        if (expense.parcelado) {
+          if (i === 0 && expense.detalhes_parcela?.firstValue) {
+            amount = expense.detalhes_parcela.firstValue;
+          } else if (expense.detalhes_parcela?.remainingValue) {
+            amount = expense.detalhes_parcela.remainingValue;
+          } else {
+            amount = expense.detalhes_parcela?.valuePerMonth || (expense.valor_total / count);
+          }
+        } else {
+          amount = expense.valor_total;
+        }
+
+        if (!data[monthKey]) data[monthKey] = { items: [], total: 0, pending: 0 };
+        
+        const isPaid = expense.parcelas_pagas?.includes(i);
+        
+        data[monthKey].items.push({
+          ...expense,
+          installmentIndex: i,
+          installmentAmount: amount,
+          isPaid,
+          installmentLabel: expense.parcelado ? `${i+1}/${count}` : 'À vista'
+        });
+        
+        data[monthKey].total += amount;
+        if (!isPaid) data[monthKey].pending += amount;
+      }
+    });
+
+    // Sort months
+    return Object.entries(data).sort((a, b) => {
+      const [yearA, monthA] = a[0].split('-').map(Number);
+      const [yearB, monthB] = b[0].split('-').map(Number);
+      if (yearA !== yearB) return yearA - yearB;
+      return monthA - monthB;
+    });
+  }, [expenses]);
+
+  return (
+    <div className="space-y-4">
+      <h3 className="text-xl font-bold text-white flex items-center gap-2 mb-4">
+        <Calendar className="text-teal-400" /> Controle Mensal (Faturas)
+      </h3>
+      
+      {monthlyData.length === 0 ? (
+        <div className="text-center text-slate-500 py-8 bg-slate-800 rounded-xl">
+          Nenhuma parcela prevista.
+        </div>
+      ) : (
+        monthlyData.map(([key, { items, total, pending }]) => {
+          const [year, month] = key.split('-').map(Number);
+          const date = new Date(year, month);
+          const monthName = date.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
+          const isExpanded = expandedMonths[key];
+          const allPaid = pending === 0;
+
+          return (
+            <div key={key} className={`bg-slate-800 rounded-xl border transition overflow-hidden ${allPaid ? 'border-teal-900/50 opacity-70' : 'border-slate-700'}`}>
+              <div 
+                onClick={() => toggleMonth(key)}
+                className="p-4 flex items-center justify-between cursor-pointer hover:bg-slate-700/50 transition"
+              >
+                <div className="flex items-center gap-3">
+                  <div className={`p-2 rounded-lg ${allPaid ? 'bg-teal-500/10 text-teal-500' : 'bg-blue-500/10 text-blue-400'}`}>
+                    <Calendar size={20} />
+                  </div>
+                  <div>
+                    <h4 className="font-bold text-white capitalize">{monthName}</h4>
+                    <p className="text-xs text-slate-400">
+                      {items.length} lançamentos
+                    </p>
+                  </div>
+                </div>
+                <div className="text-right">
+                  <div className="text-lg font-bold text-white">{formatCurrency(total)}</div>
+                  <div className={`text-xs ${pending === 0 ? 'text-teal-500' : 'text-orange-400'}`}>
+                    {pending === 0 ? 'Mês Quitado' : `Falta: ${formatCurrency(pending)}`}
+                  </div>
+                </div>
+              </div>
+
+              {isExpanded && (
+                <div className="bg-slate-900/50 border-t border-slate-700 divide-y divide-slate-700/50">
+                  {items.map((item, idx) => (
+                    <div key={`${item.id}-${idx}`} className="p-4 flex items-center justify-between hover:bg-slate-800/50">
+                      <div className="flex-1">
+                        <div className="flex items-center gap-2">
+                          <span className="text-white font-medium">{item.descricao}</span>
+                          <span className="text-[10px] bg-slate-700 px-1.5 py-0.5 rounded text-slate-300">
+                            {item.installmentLabel}
+                          </span>
+                        </div>
+                        <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2">
+                          <span>{item.quem_pagou === 'person1' ? settings.person1 : settings.person2}</span>
+                          <span>•</span>
+                          <span>{item.nome_cartao || item.forma_pagamento}</span>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-center gap-4">
+                        <span className="text-white font-bold">{formatCurrency(item.installmentAmount)}</span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            togglePayment(item.id, item.installmentIndex, item.parcelas_pagas || []);
+                          }}
+                          className={`p-2 rounded-full transition ${item.isPaid ? 'text-teal-400 bg-teal-400/10 hover:bg-teal-400/20' : 'text-slate-500 hover:text-white hover:bg-slate-700'}`}
+                          title={item.isPaid ? "Pago" : "Marcar como Pago"}
+                        >
+                          {item.isPaid ? <CheckCircle size={20} /> : <Circle size={20} />}
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        })
+      )}
+    </div>
+  );
+};
+
+const ExpenseList = ({ expenses, onDelete, settings }) => {
+  const [filter, setFilter] = useState('todos');
+
+  const filteredExpenses = expenses.filter(exp => {
+    if (filter === 'todos') return true;
+    if (filter === 'person1') return exp.quem_pagou === 'person1';
+    if (filter === 'person2') return exp.quem_pagou === 'person2';
+    return exp.categoria === filter;
+  });
+
+  return (
+    <div className="bg-slate-800 rounded-xl border border-slate-700 shadow-sm overflow-hidden">
+      <div className="p-4 border-b border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+          <CreditCard size={18} className="text-teal-400" /> Histórico Geral
+        </h3>
+        <select 
+          className="bg-slate-900 border border-slate-600 text-white text-sm rounded-lg p-2 focus:ring-teal-500 focus:border-teal-500 outline-none"
+          value={filter}
+          onChange={(e) => setFilter(e.target.value)}
+        >
+          <option value="todos">Todos os Gastos</option>
+          <option value="person1">Pago por {settings.person1}</option>
+          <option value="person2">Pago por {settings.person2}</option>
+          <option disabled>--- Categorias ---</option>
+          <option value="Passagem">Passagem</option>
+          <option value="Hospedagem">Hospedagem</option>
+          <option value="Alimentação">Alimentação</option>
+          <option value="Passeios">Passeios</option>
+        </select>
+      </div>
+      
+      <div className="overflow-x-auto">
+        <table className="w-full text-left text-sm text-slate-400">
+          <thead className="bg-slate-900/50 text-slate-200 uppercase text-xs">
+            <tr>
+              <th className="px-6 py-3">Data</th>
+              <th className="px-6 py-3">Descrição</th>
+              <th className="px-6 py-3">Quem Pagou</th>
+              <th className="px-6 py-3 text-right">Valor Total</th>
+              <th className="px-6 py-3 text-center">Ações</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-700">
+            {filteredExpenses.length === 0 ? (
+              <tr>
+                <td colSpan="5" className="px-6 py-8 text-center text-slate-500 italic">
+                  Nenhum gasto registrado ainda.
+                </td>
+              </tr>
+            ) : (
+              filteredExpenses.map((expense) => (
+                <tr key={expense.id} className="hover:bg-slate-700/30 transition">
+                  <td className="px-6 py-4">
+                    {new Date(expense.data).toLocaleDateString('pt-BR')}
+                  </td>
+                  <td className="px-6 py-4 font-medium text-white">
+                    {expense.descricao}
+                    <div className="text-xs text-slate-500 mt-0.5">{expense.forma_pagamento}</div>
+                  </td>
+                  <td className="px-6 py-4">
+                     <span className={`px-2 py-1 rounded text-xs ${expense.quem_pagou === 'person1' ? 'bg-teal-500/10 text-teal-300' : 'bg-purple-500/10 text-purple-300'}`}>
+                        {expense.quem_pagou === 'person1' ? settings.person1 : settings.person2}
+                     </span>
+                  </td>
+                  <td className="px-6 py-4 text-right text-white font-bold">
+                    {formatCurrency(expense.valor_total)}
+                  </td>
+                  <td className="px-6 py-4 text-center">
+                    <button 
+                      onClick={() => onDelete(expense.id)}
+                      className="text-red-400 hover:text-red-300 hover:bg-red-500/10 p-1.5 rounded-full transition"
+                      title="Excluir"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const ChartsSection = ({ expenses, settings }) => {
+  const categoryData = useMemo(() => {
+    const data = {};
+    expenses.forEach(exp => {
+      data[exp.categoria] = (data[exp.categoria] || 0) + parseFloat(exp.valor_total);
+    });
+    return Object.keys(data).map(key => ({ name: key, value: data[key] }));
+  }, [expenses]);
+
+  const payerData = useMemo(() => {
+    let p1 = 0, p2 = 0;
+    expenses.forEach(exp => {
+      if (exp.quem_pagou === 'person1') p1 += parseFloat(exp.valor_total);
+      else p2 += parseFloat(exp.valor_total);
+    });
+    return [
+      { name: settings.person1, valor: p1 },
+      { name: settings.person2, valor: p2 }
+    ];
+  }, [expenses, settings]);
+
+  if (expenses.length === 0) return null;
+
+  return (
+    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+      <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-sm">
+        <h3 className="text-lg font-bold text-white mb-4">Gastos por Categoria</h3>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={categoryData}
+                cx="50%"
+                cy="50%"
+                innerRadius={60}
+                outerRadius={80}
+                fill="#8884d8"
+                paddingAngle={5}
+                dataKey="value"
+              >
+                {categoryData.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                ))}
+              </Pie>
+              <Tooltip formatter={(value) => formatCurrency(value)} contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }} />
+              <Legend />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+
+      <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-sm">
+        <h3 className="text-lg font-bold text-white mb-4">Quem Pagou Mais?</h3>
+        <div className="h-64">
+          <ResponsiveContainer width="100%" height="100%">
+            <BarChart data={payerData}>
+              <XAxis dataKey="name" stroke="#94a3b8" />
+              <YAxis stroke="#94a3b8" tickFormatter={(val) => `R$${val/1000}k`} />
+              <Tooltip formatter={(value) => formatCurrency(value)} contentStyle={{ backgroundColor: '#1e293b', borderColor: '#334155', color: '#fff' }} />
+              <Bar dataKey="valor" radius={[4, 4, 0, 0]} barSize={50}>
+                 {payerData.map((entry, index) => (
+                    <Cell key={`cell-${index}`} fill={index === 0 ? '#2dd4bf' : '#a855f7'} />
+                 ))}
+              </Bar>
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// --- Componente Principal ---
+export default function App() {
+  const [user, setUser] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [showForm, setShowForm] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [activeTab, setActiveTab] = useState('dashboard'); // dashboard | monthly
+  const [expenses, setExpenses] = useState([]);
+  const [settings, setSettings] = useState({ person1: 'Eu', person2: 'Namorada' });
+
+  // Auth Listener
+  useEffect(() => {
+    const initAuth = async () => {
+      if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+        await signInWithCustomToken(auth, __initial_auth_token);
+      }
+    };
+    initAuth();
+    
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+      setLoading(false);
+    });
+    return () => unsubscribe();
+  }, []);
+
+  // Sync Data (Expenses & Settings)
+  useEffect(() => {
+    if (!user) {
+      setExpenses([]);
+      return;
+    }
+
+    // Usando coleção pública para compartilhar dados entre contas diferentes
+    const expenseQuery = query(
+      collection(db, 'artifacts', appId, 'public', 'data', 'expenses'),
+      orderBy('data', 'desc')
+    );
+
+    const unsubExpenses = onSnapshot(expenseQuery, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      setExpenses(docs);
+    });
+
+    // Load Settings
+    const settingsRef = doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config');
+    const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
+      if (docSnap.exists()) {
+        setSettings(docSnap.data());
+      } else {
+        // Init default settings if not exists
+        setDoc(settingsRef, { person1: 'Eu', person2: 'Ela' });
+      }
+    });
+
+    return () => {
+      unsubExpenses();
+      unsubSettings();
+    };
+  }, [user]);
+
+  const saveSettings = async (newSettings) => {
+    await setDoc(doc(db, 'artifacts', appId, 'public', 'data', 'settings', 'config'), newSettings);
+  };
+
+  const handleDelete = async (id) => {
+    if (confirm('Tem certeza que deseja excluir este gasto?')) {
+      await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'expenses', id));
+    }
+  };
+
+  const handleLogout = () => signOut(auth);
+
+  if (loading) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-teal-500">Carregando...</div>;
+
+  if (!user) return <AuthScreen setUser={setUser} />;
+
+  return (
+    <div className="min-h-screen bg-slate-900 text-slate-200 pb-12 font-sans">
+      {/* Header */}
+      <header className="bg-slate-800 border-b border-slate-700 sticky top-0 z-30 shadow-lg">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="bg-teal-500/20 p-2 rounded-lg">
+              <Snowflake className="text-teal-400" size={24} />
+            </div>
+            <h1 className="text-xl font-bold text-white hidden sm:block">Ushuaia Manager</h1>
+          </div>
+          
+          <div className="flex items-center gap-4">
+             <button 
+              onClick={() => setShowSettings(true)}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-full transition"
+              title="Configurações"
+            >
+              <Settings size={20} />
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-full transition"
+              title="Sair"
+            >
+              <LogOut size={20} />
+            </button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <Countdown />
+
+        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+           {/* Tabs */}
+           <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700">
+             <button 
+              onClick={() => setActiveTab('dashboard')}
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'dashboard' ? 'bg-teal-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+             >
+               Visão Geral
+             </button>
+             <button 
+              onClick={() => setActiveTab('monthly')}
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition ${activeTab === 'monthly' ? 'bg-teal-600 text-white shadow-lg' : 'text-slate-400 hover:text-white'}`}
+             >
+               Faturas / Mensal
+             </button>
+           </div>
+
+          <button 
+            onClick={() => setShowForm(true)}
+            className="bg-teal-600 hover:bg-teal-500 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-teal-900/40 transition hover:scale-105"
+          >
+            <Plus size={20} />
+            <span>Adicionar Gasto</span>
+          </button>
+        </div>
+
+        {activeTab === 'dashboard' ? (
+          <div className="animate-in fade-in duration-500">
+            <SummaryCards expenses={expenses} settings={settings} />
+            <ChartsSection expenses={expenses} settings={settings} />
+            <ExpenseList expenses={expenses} onDelete={handleDelete} settings={settings} />
+          </div>
+        ) : (
+          <div className="animate-in fade-in duration-500">
+             <MonthlyView expenses={expenses} settings={settings} />
+          </div>
+        )}
+      </main>
+
+      {/* Modals */}
+      {showForm && <ExpenseForm onClose={() => setShowForm(false)} settings={settings} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} settings={settings} onSave={saveSettings} />}
+    </div>
+  );
+}
