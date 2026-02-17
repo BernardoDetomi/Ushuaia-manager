@@ -24,6 +24,7 @@ import SettingsModal from './components/SettingsModal';
 import ActivitiesList from './components/ActivitiesList';
 import ActivityForm from './components/ActivityForm';
 import PendingApproval from './components/PendingApproval';
+import PackingChecklist from './components/PackingChecklist';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -35,6 +36,7 @@ export default function App() {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [expenses, setExpenses] = useState([]);
   const [activities, setActivities] = useState([]);
+  const [checklistItems, setChecklistItems] = useState([]);
   const [settings, setSettings] = useState({ person1: 'Eu', person2: 'Namorada' });
   const [isApproved, setIsApproved] = useState(null); // null = loading, true/false
 
@@ -53,6 +55,7 @@ export default function App() {
     if (!user) {
       setExpenses([]);
       setActivities([]);
+      setChecklistItems([]);
       setIsApproved(null);
       return;
     }
@@ -95,6 +98,17 @@ export default function App() {
       setActivities(docs);
     });
 
+    // Load Checklist Items
+    const checklistQuery = query(
+      collection(db, 'checklist'),
+      orderBy('createdAt', 'asc')
+    );
+
+    const unsubChecklist = onSnapshot(checklistQuery, (snapshot) => {
+      const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+      setChecklistItems(docs);
+    });
+
     // Load Settings
     const settingsRef = doc(db, 'settings', 'config');
     const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
@@ -109,6 +123,7 @@ export default function App() {
       unsubUser();
       unsubExpenses();
       unsubActivities();
+      unsubChecklist();
       unsubSettings();
     };
   }, [user]);
@@ -189,6 +204,16 @@ export default function App() {
             >
               Passeios
             </button>
+            <button
+              onClick={() => setActiveTab('checklist')}
+              className={`px-6 py-2 rounded-lg text-sm font-bold transition ${
+                activeTab === 'checklist'
+                  ? 'bg-purple-600 text-white shadow-lg'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+            >
+              Bagagem
+            </button>
           </div>
 
           {activeTab === 'activities' ? (
@@ -199,7 +224,7 @@ export default function App() {
               <MapPin size={20} />
               <span>Novo Passeio</span>
             </button>
-          ) : (
+          ) : activeTab !== 'checklist' ? (
             <button
               onClick={() => setShowForm(true)}
               className="bg-teal-600 hover:bg-teal-500 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-teal-900/40 transition hover:scale-105"
@@ -207,7 +232,7 @@ export default function App() {
               <Plus size={20} />
               <span>Adicionar Gasto</span>
             </button>
-          )}
+          ) : null}
         </div>
 
         {activeTab === 'dashboard' && (
@@ -225,6 +250,11 @@ export default function App() {
         {activeTab === 'activities' && (
           <div>
             <ActivitiesList activities={activities} />
+          </div>
+        )}
+        {activeTab === 'checklist' && (
+          <div>
+            <PackingChecklist items={checklistItems} settings={settings} />
           </div>
         )}
       </main>
