@@ -143,34 +143,36 @@ const PersonSection = ({ personName, items, color }) => {
       )}
 
       {/* Add item row */}
-      <div className="px-5 py-4 flex gap-2">
-        <input
-          type="text"
-          placeholder="Nome do item..."
-          value={newItem}
-          onChange={(e) => setNewItem(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className={`flex-1 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 ${c.ring} transition`}
-        />
-        <input
-          type="text"
-          placeholder="Qtd"
-          value={newQty}
-          onChange={(e) => setNewQty(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className={`w-24 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 ${c.ring} transition`}
-        />
-        <button
-          onClick={handleAdd}
-          disabled={!newItem.trim()}
-          className={`${c.btn} text-white p-2 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105`}
-        >
-          <Plus size={20} />
-        </button>
+      <div className="px-4 sm:px-5 py-4">
+        <div className="flex gap-2">
+          <input
+            type="text"
+            placeholder="Nome do item..."
+            value={newItem}
+            onChange={(e) => setNewItem(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className={`flex-1 min-w-0 bg-slate-700 border border-slate-600 rounded-lg px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 ${c.ring} transition`}
+          />
+          <input
+            type="text"
+            placeholder="Qtd"
+            value={newQty}
+            onChange={(e) => setNewQty(e.target.value)}
+            onKeyDown={handleKeyDown}
+            className={`w-16 sm:w-24 bg-slate-700 border border-slate-600 rounded-lg px-2 sm:px-3 py-2 text-sm text-white placeholder-slate-500 focus:outline-none focus:ring-2 ${c.ring} transition`}
+          />
+          <button
+            onClick={handleAdd}
+            disabled={!newItem.trim()}
+            className={`${c.btn} text-white p-2 rounded-lg transition disabled:opacity-40 disabled:cursor-not-allowed hover:scale-105 flex-shrink-0`}
+          >
+            <Plus size={20} />
+          </button>
+        </div>
       </div>
 
       {/* Items list */}
-      <div className="px-5 pb-4 space-y-1">
+      <div className="px-4 sm:px-5 pb-4 space-y-1">
         {items.length === 0 && (
           <p className="text-slate-500 text-sm text-center py-4">
             Nenhum item adicionado ainda
@@ -182,7 +184,7 @@ const PersonSection = ({ personName, items, color }) => {
           return (
             <div
               key={item.id}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition group ${
+              className={`rounded-lg transition group ${
                 allPacked
                   ? 'bg-slate-700/30'
                   : 'bg-slate-700/60 hover:bg-slate-700'
@@ -190,104 +192,113 @@ const PersonSection = ({ personName, items, color }) => {
             >
               {editingId === item.id ? (
                 /* Editing mode */
-                <>
-                  <input
-                    type="text"
-                    value={editItem}
-                    onChange={(e) => setEditItem(e.target.value)}
-                    onKeyDown={(e) => handleEditKeyDown(e, item.id)}
-                    autoFocus
-                    className={`flex-1 bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 ${c.ring}`}
-                  />
-                  <input
-                    type="text"
-                    value={editQty}
-                    onChange={(e) => setEditQty(e.target.value)}
-                    onKeyDown={(e) => handleEditKeyDown(e, item.id)}
-                    className={`w-20 bg-slate-600 border border-slate-500 rounded px-2 py-1 text-sm text-white focus:outline-none focus:ring-2 ${c.ring}`}
-                  />
-                  <button
-                    onClick={() => saveEdit(item.id)}
-                    className="text-green-400 hover:text-green-300 p-1"
-                  >
-                    <Check size={16} />
-                  </button>
-                  <button
-                    onClick={cancelEdit}
-                    className="text-slate-400 hover:text-slate-300 p-1"
-                  >
-                    <X size={16} />
-                  </button>
-                </>
-              ) : (
-                /* Normal mode */
-                <>
-                  {/* Item name */}
-                  <span
-                    className={`flex-1 text-sm transition ${
-                      allPacked
-                        ? 'line-through text-slate-500'
-                        : 'text-slate-200'
-                    }`}
-                  >
-                    {item.item}
-                  </span>
-
-                  {/* Quantity badge */}
-                  <span
-                    className={`text-xs px-2 py-0.5 rounded-md ${
-                      allPacked
-                        ? 'bg-slate-700 text-slate-500'
-                        : 'bg-slate-600 text-slate-300'
-                    }`}
-                  >
-                    {item.quantity}
-                  </span>
-
-                  {/* Bolsa de mão check */}
-                  <button
-                    onClick={() => toggleField(item.id, 'handBag', item.handBag)}
-                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition ${
-                      item.handBag
-                        ? 'bg-amber-500/20 text-amber-400'
-                        : 'bg-slate-700 text-slate-500 hover:text-slate-300'
-                    }`}
-                    title="Bolsa de mão"
-                  >
-                    {item.handBag ? <CheckCircle2 size={14} /> : <Circle size={14} />}
-                    <ShoppingBag size={14} />
-                  </button>
-
-                  {/* Mala check */}
-                  <button
-                    onClick={() => toggleField(item.id, 'suitcase', item.suitcase)}
-                    className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition ${
-                      item.suitcase
-                        ? 'bg-blue-500/20 text-blue-400'
-                        : 'bg-slate-700 text-slate-500 hover:text-slate-300'
-                    }`}
-                    title="Mala"
-                  >
-                    {item.suitcase ? <CheckCircle2 size={14} /> : <Circle size={14} />}
-                    <Briefcase size={14} />
-                  </button>
-
-                  {/* Edit / Delete */}
-                  <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition">
+                <div className="p-3 space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      type="text"
+                      value={editItem}
+                      onChange={(e) => setEditItem(e.target.value)}
+                      onKeyDown={(e) => handleEditKeyDown(e, item.id)}
+                      autoFocus
+                      className={`flex-1 min-w-0 bg-slate-600 border border-slate-500 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-2 ${c.ring}`}
+                    />
+                    <input
+                      type="text"
+                      value={editQty}
+                      onChange={(e) => setEditQty(e.target.value)}
+                      onKeyDown={(e) => handleEditKeyDown(e, item.id)}
+                      className={`w-16 sm:w-20 bg-slate-600 border border-slate-500 rounded px-2 py-1.5 text-sm text-white focus:outline-none focus:ring-2 ${c.ring}`}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
                     <button
-                      onClick={() => startEdit(item)}
-                      className="text-slate-400 hover:text-blue-400 p-1 transition"
+                      onClick={cancelEdit}
+                      className="text-slate-400 hover:text-slate-300 px-3 py-1 text-xs rounded-md bg-slate-600 transition"
                     >
-                      <Pencil size={14} />
+                      Cancelar
                     </button>
                     <button
-                      onClick={() => handleDelete(item.id)}
-                      className="text-slate-400 hover:text-red-400 p-1 transition"
+                      onClick={() => saveEdit(item.id)}
+                      className="text-white px-3 py-1 text-xs rounded-md bg-green-600 hover:bg-green-500 transition"
                     >
-                      <Trash2 size={14} />
+                      Salvar
                     </button>
                   </div>
-                </>
+                </div>
+              ) : (
+                /* Normal mode */
+                <div className="px-3 py-2.5">
+                  {/* Top row: item name + quantity */}
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span
+                      className={`flex-1 text-sm transition min-w-0 break-words ${
+                        allPacked
+                          ? 'line-through text-slate-500'
+                          : 'text-slate-200'
+                      }`}
+                    >
+                      {item.item}
+                    </span>
+                    <span
+                      className={`text-xs px-2 py-0.5 rounded-md flex-shrink-0 ${
+                        allPacked
+                          ? 'bg-slate-700 text-slate-500'
+                          : 'bg-slate-600 text-slate-300'
+                      }`}
+                    >
+                      {item.quantity}
+                    </span>
+                  </div>
+
+                  {/* Bottom row: check buttons + actions */}
+                  <div className="flex items-center gap-2">
+                    {/* Bolsa de mão check */}
+                    <button
+                      onClick={() => toggleField(item.id, 'handBag', item.handBag)}
+                      className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition ${
+                        item.handBag
+                          ? 'bg-amber-500/20 text-amber-400'
+                          : 'bg-slate-700 text-slate-500 hover:text-slate-300'
+                      }`}
+                      title="Bolsa de mão"
+                    >
+                      {item.handBag ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                      <ShoppingBag size={14} />
+                    </button>
+
+                    {/* Mala check */}
+                    <button
+                      onClick={() => toggleField(item.id, 'suitcase', item.suitcase)}
+                      className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition ${
+                        item.suitcase
+                          ? 'bg-blue-500/20 text-blue-400'
+                          : 'bg-slate-700 text-slate-500 hover:text-slate-300'
+                      }`}
+                      title="Mala"
+                    >
+                      {item.suitcase ? <CheckCircle2 size={14} /> : <Circle size={14} />}
+                      <Briefcase size={14} />
+                    </button>
+
+                    <div className="flex-1" />
+
+                    {/* Edit / Delete - always visible on mobile */}
+                    <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition">
+                      <button
+                        onClick={() => startEdit(item)}
+                        className="text-slate-400 hover:text-blue-400 p-1 transition"
+                      >
+                        <Pencil size={14} />
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="text-slate-400 hover:text-red-400 p-1 transition"
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  </div>
+                </div>
               )}
             </div>
           );

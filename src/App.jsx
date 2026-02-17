@@ -173,10 +173,10 @@ export default function App() {
 
         <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
           {/* Tabs */}
-          <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700">
+          <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700 overflow-x-auto max-w-full scrollbar-hide">
             <button
               onClick={() => setActiveTab('dashboard')}
-              className={`px-6 py-2 rounded-lg text-sm font-bold transition ${
+              className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
                 activeTab === 'dashboard'
                   ? 'bg-teal-600 text-white shadow-lg'
                   : 'text-slate-400 hover:text-white'
@@ -186,7 +186,7 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveTab('monthly')}
-              className={`px-6 py-2 rounded-lg text-sm font-bold transition ${
+              className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
                 activeTab === 'monthly'
                   ? 'bg-teal-600 text-white shadow-lg'
                   : 'text-slate-400 hover:text-white'
@@ -196,7 +196,7 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveTab('activities')}
-              className={`px-6 py-2 rounded-lg text-sm font-bold transition ${
+              className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
                 activeTab === 'activities'
                   ? 'bg-orange-600 text-white shadow-lg'
                   : 'text-slate-400 hover:text-white'
@@ -206,7 +206,7 @@ export default function App() {
             </button>
             <button
               onClick={() => setActiveTab('checklist')}
-              className={`px-6 py-2 rounded-lg text-sm font-bold transition ${
+              className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
                 activeTab === 'checklist'
                   ? 'bg-purple-600 text-white shadow-lg'
                   : 'text-slate-400 hover:text-white'
