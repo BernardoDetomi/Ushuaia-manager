@@ -3,7 +3,8 @@ import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Plus, Pencil } from 'lucide-react';
 
-const ExpenseForm = ({ onClose, settings, editingExpense }) => {
+const ExpenseForm = ({ onClose, settings, editingExpense, collectionName = 'expenses' }) => {
+  const isSplit = collectionName === 'split_expenses';
   const isEditing = !!editingExpense;
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -59,9 +60,9 @@ const ExpenseForm = ({ onClose, settings, editingExpense }) => {
       };
 
       if (isEditing) {
-        await updateDoc(doc(db, 'expenses', editingExpense.id), expenseData);
+        await updateDoc(doc(db, collectionName, editingExpense.id), expenseData);
       } else {
-        await addDoc(collection(db, 'expenses'), {
+        await addDoc(collection(db, collectionName), {
           ...expenseData,
           parcelas_pagas: [],
         });
@@ -134,13 +135,29 @@ const ExpenseForm = ({ onClose, settings, editingExpense }) => {
                 value={formData.category}
                 onChange={(e) => setFormData({ ...formData, category: e.target.value })}
               >
-                <option>Passagem</option>
-                <option>Hospedagem</option>
-                <option>Alimentação</option>
-                <option>Passeios</option>
-                <option>Transporte</option>
-                <option>Presentes</option>
-                <option>Outros</option>
+                {isSplit ? (
+                  <>
+                    <option>Mercado</option>
+                    <option>Alimentação</option>
+                    <option>Casa</option>
+                    <option>Saúde</option>
+                    <option>Lazer</option>
+                    <option>Transporte</option>
+                    <option>Assinaturas</option>
+                    <option>Pet</option>
+                    <option>Outros</option>
+                  </>
+                ) : (
+                  <>
+                    <option>Passagem</option>
+                    <option>Hospedagem</option>
+                    <option>Alimentação</option>
+                    <option>Passeios</option>
+                    <option>Transporte</option>
+                    <option>Presentes</option>
+                    <option>Outros</option>
+                  </>
+                )}
               </select>
             </div>
             <div>

@@ -4,7 +4,7 @@ import { db } from '../config/firebase';
 import { Calendar, CheckCircle, Circle, User, Users, ArrowRightLeft } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 
-const MonthlyView = ({ expenses, settings }) => {
+const MonthlyView = ({ expenses, settings, collectionName = 'expenses' }) => {
   const [expandedMonths, setExpandedMonths] = useState({});
 
   const toggleMonth = (monthKey) => {
@@ -21,7 +21,7 @@ const MonthlyView = ({ expenses, settings }) => {
     }
 
     try {
-      const docRef = doc(db, 'expenses', expenseId);
+      const docRef = doc(db, collectionName, expenseId);
       await updateDoc(docRef, { parcelas_pagas_v2: newPaidMap });
     } catch (err) {
       console.error('Error updating payment:', err);

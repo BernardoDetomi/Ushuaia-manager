@@ -2,7 +2,7 @@ import React, { useMemo } from 'react';
 import { Wallet, User, Users, TrendingUp } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 
-const SummaryCards = ({ expenses, settings }) => {
+const SummaryCards = ({ expenses, settings, subtitle = 'Custo total da viagem' }) => {
   const summary = useMemo(() => {
     let total = 0;
     let paidByMe = 0;
@@ -31,7 +31,7 @@ const SummaryCards = ({ expenses, settings }) => {
           <span className="text-xs text-slate-400 bg-slate-700 px-2 py-1 rounded">Total</span>
         </div>
         <h3 className="text-2xl font-bold text-white">{formatCurrency(summary.total)}</h3>
-        <p className="text-sm text-slate-400 mt-1">Custo total da viagem</p>
+        <p className="text-sm text-slate-400 mt-1">{subtitle}</p>
       </div>
 
       <div className="bg-slate-800 p-5 rounded-xl border border-slate-700 shadow-sm">

@@ -25,6 +25,7 @@ import ActivitiesList from './components/ActivitiesList';
 import ActivityForm from './components/ActivityForm';
 import PendingApproval from './components/PendingApproval';
 import PackingChecklist from './components/PackingChecklist';
+import SplitMain from './components/split/SplitMain';
 
 export default function App() {
   const [user, setUser] = useState(null);
@@ -39,6 +40,9 @@ export default function App() {
   const [checklistItems, setChecklistItems] = useState([]);
   const [settings, setSettings] = useState({ person1: 'Eu', person2: 'Namorada' });
   const [isApproved, setIsApproved] = useState(null); // null = loading, true/false
+
+  // App mode: 'ushuaia' or 'split'
+  const [appMode, setAppMode] = useState('ushuaia');
 
   // Auth Listener
   useEffect(() => {
@@ -164,104 +168,127 @@ export default function App() {
     return <PendingApproval />;
   }
 
+  const handleToggleMode = (mode) => {
+    setAppMode(mode);
+    setShowForm(false);
+    setEditingExpense(null);
+  };
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 pb-12 font-sans">
-      <Header onOpenSettings={() => setShowSettings(true)} onLogout={handleLogout} />
+      <Header
+        onOpenSettings={() => setShowSettings(true)}
+        onLogout={handleLogout}
+        appMode={appMode}
+        onToggleMode={handleToggleMode}
+      />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <Countdown />
+      {appMode === 'ushuaia' ? (
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <Countdown />
 
-        <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-          {/* Tabs */}
-          <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700 overflow-x-auto max-w-full scrollbar-hide">
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
-                activeTab === 'dashboard'
-                  ? 'bg-teal-600 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Visão Geral
-            </button>
-            <button
-              onClick={() => setActiveTab('monthly')}
-              className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
-                activeTab === 'monthly'
-                  ? 'bg-teal-600 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Faturas / Mensal
-            </button>
-            <button
-              onClick={() => setActiveTab('activities')}
-              className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
-                activeTab === 'activities'
-                  ? 'bg-orange-600 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Passeios
-            </button>
-            <button
-              onClick={() => setActiveTab('checklist')}
-              className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
-                activeTab === 'checklist'
-                  ? 'bg-purple-600 text-white shadow-lg'
-                  : 'text-slate-400 hover:text-white'
-              }`}
-            >
-              Bagagem
-            </button>
+          <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
+            <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700 overflow-x-auto max-w-full scrollbar-hide">
+              <button
+                onClick={() => setActiveTab('dashboard')}
+                className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
+                  activeTab === 'dashboard'
+                    ? 'bg-teal-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Visão Geral
+              </button>
+              <button
+                onClick={() => setActiveTab('monthly')}
+                className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
+                  activeTab === 'monthly'
+                    ? 'bg-teal-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Faturas / Mensal
+              </button>
+              <button
+                onClick={() => setActiveTab('activities')}
+                className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
+                  activeTab === 'activities'
+                    ? 'bg-orange-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Passeios
+              </button>
+              <button
+                onClick={() => setActiveTab('checklist')}
+                className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
+                  activeTab === 'checklist'
+                    ? 'bg-purple-600 text-white shadow-lg'
+                    : 'text-slate-400 hover:text-white'
+                }`}
+              >
+                Bagagem
+              </button>
+            </div>
+
+            {activeTab === 'activities' ? (
+              <button
+                onClick={() => setShowActivityForm(true)}
+                className="bg-orange-600 hover:bg-orange-500 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-orange-900/40 transition hover:scale-105"
+              >
+                <MapPin size={20} />
+                <span>Novo Passeio</span>
+              </button>
+            ) : activeTab !== 'checklist' ? (
+              <button
+                onClick={() => setShowForm(true)}
+                className="bg-teal-600 hover:bg-teal-500 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-teal-900/40 transition hover:scale-105"
+              >
+                <Plus size={20} />
+                <span>Adicionar Gasto</span>
+              </button>
+            ) : null}
           </div>
 
-          {activeTab === 'activities' ? (
-            <button
-              onClick={() => setShowActivityForm(true)}
-              className="bg-orange-600 hover:bg-orange-500 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-orange-900/40 transition hover:scale-105"
-            >
-              <MapPin size={20} />
-              <span>Novo Passeio</span>
-            </button>
-          ) : activeTab !== 'checklist' ? (
-            <button
-              onClick={() => setShowForm(true)}
-              className="bg-teal-600 hover:bg-teal-500 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-teal-900/40 transition hover:scale-105"
-            >
-              <Plus size={20} />
-              <span>Adicionar Gasto</span>
-            </button>
-          ) : null}
-        </div>
-
-        {activeTab === 'dashboard' && (
-          <div>
-            <SummaryCards expenses={expenses} settings={settings} />
-            <ChartsSection expenses={expenses} settings={settings} />
-            <ExpenseList expenses={expenses} onDelete={handleDelete} onEdit={(exp) => { setEditingExpense(exp); setShowForm(true); }} settings={settings} />
-          </div>
-        )}
-        {activeTab === 'monthly' && (
-          <div>
+          {activeTab === 'dashboard' && (
+            <div>
+              <SummaryCards expenses={expenses} settings={settings} />
+              <ChartsSection expenses={expenses} settings={settings} />
+              <ExpenseList
+                expenses={expenses}
+                onDelete={handleDelete}
+                onEdit={(exp) => { setEditingExpense(exp); setShowForm(true); }}
+                settings={settings}
+              />
+            </div>
+          )}
+          {activeTab === 'monthly' && (
             <MonthlyView expenses={expenses} settings={settings} />
-          </div>
-        )}
-        {activeTab === 'activities' && (
-          <div>
+          )}
+          {activeTab === 'activities' && (
             <ActivitiesList activities={activities} />
-          </div>
-        )}
-        {activeTab === 'checklist' && (
-          <div>
+          )}
+          {activeTab === 'checklist' && (
             <PackingChecklist items={checklistItems} settings={settings} />
-          </div>
-        )}
-      </main>
+          )}
+        </main>
+      ) : (
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+          <SplitMain user={user} settings={settings} />
+        </main>
+      )}
 
-      {/* Modals */}
-      {showForm && <ExpenseForm onClose={() => { setShowForm(false); setEditingExpense(null); }} settings={settings} editingExpense={editingExpense} />}
-      {showActivityForm && <ActivityForm onClose={() => setShowActivityForm(false)} />}
+      {/* Modals (Ushuaia) */}
+      {appMode === 'ushuaia' && showForm && (
+        <ExpenseForm
+          onClose={() => { setShowForm(false); setEditingExpense(null); }}
+          settings={settings}
+          editingExpense={editingExpense}
+        />
+      )}
+      {appMode === 'ushuaia' && showActivityForm && (
+        <ActivityForm onClose={() => setShowActivityForm(false)} />
+      )}
       {showSettings && (
         <SettingsModal
           onClose={() => setShowSettings(false)}
