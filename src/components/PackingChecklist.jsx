@@ -311,23 +311,31 @@ const PersonSection = ({ personName, items, color }) => {
 const PackingChecklist = ({ items, settings }) => {
   const allPacked = (i) => i.handBag && i.suitcase;
 
-  const person1Items = items
-    .filter((i) => i.person === settings.person1)
-    .sort((a, b) => {
+  const sortItems = (list) =>
+    list.sort((a, b) => {
       const aPacked = allPacked(a);
       const bPacked = allPacked(b);
       if (aPacked !== bPacked) return aPacked ? 1 : -1;
       return a.createdAt?.localeCompare(b.createdAt) || 0;
     });
 
-  const person2Items = items
-    .filter((i) => i.person === settings.person2)
-    .sort((a, b) => {
-      const aPacked = allPacked(a);
-      const bPacked = allPacked(b);
-      if (aPacked !== bPacked) return aPacked ? 1 : -1;
-      return a.createdAt?.localeCompare(b.createdAt) || 0;
-    });
+  // Agrupar por person — encontrar quais persons existem nos dados
+  const personNames = [...new Set(items.map((i) => i.person).filter(Boolean))];
+
+  // Mapear para settings (person1 primeiro, person2 segundo, resto depois)
+  const orderedPersons = [];
+  if (personNames.includes(settings.person1)) {
+    orderedPersons.push(settings.person1);
+  }
+  if (personNames.includes(settings.person2)) {
+    orderedPersons.push(settings.person2);
+  }
+  // Adicionar qualquer pessoa que exista nos dados mas não bate com settings
+  personNames.forEach((p) => {
+    if (!orderedPersons.includes(p)) orderedPersons.push(p);
+  });
+
+  const colors = ['teal', 'pink', 'teal', 'pink'];
 
   const totalPacked = items.filter(allPacked).length;
   const totalItems = items.length;
@@ -349,18 +357,30 @@ const PackingChecklist = ({ items, settings }) => {
         )}
       </div>
 
-      {/* Two person sections */}
+      {/* Person sections — dinâmico por pessoa encontrada nos dados */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <PersonSection
-          personName={settings.person1}
-          items={person1Items}
-          color="teal"
-        />
-        <PersonSection
-          personName={settings.person2}
-          items={person2Items}
-          color="pink"
-        />
+        {orderedPersons.map((personName, idx) => (
+          <PersonSection
+            key={personName}
+            personName={personName}
+            items={sortItems(items.filter((i) => i.person === personName))}
+            color={colors[idx % colors.length]}
+          />
+        ))}
+        {orderedPersons.length === 0 && (
+          <div className="col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <PersonSection
+              personName={settings.person1}
+              items={[]}
+              color="teal"
+            />
+            <PersonSection
+              personName={settings.person2}
+              items={[]}
+              color="pink"
+            />
+          </div>
+        )}
       </div>
     </div>
   );
