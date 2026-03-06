@@ -102,16 +102,15 @@ export default function App() {
       setActivities(docs);
     });
 
-    // Load Checklist Items
-    const checklistQuery = query(
+    // Load Checklist Items (sem orderBy — o componente já ordena client-side)
+    const unsubChecklist = onSnapshot(
       collection(db, 'checklist'),
-      orderBy('createdAt', 'asc')
+      (snapshot) => {
+        const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
+        setChecklistItems(docs);
+      },
+      (err) => console.error('Checklist listener error:', err)
     );
-
-    const unsubChecklist = onSnapshot(checklistQuery, (snapshot) => {
-      const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setChecklistItems(docs);
-    });
 
     // Load Settings
     const settingsRef = doc(db, 'settings', 'config');
