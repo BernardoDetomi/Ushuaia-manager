@@ -2,10 +2,11 @@ import React, { useState } from 'react';
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  signOut,
 } from 'firebase/auth';
 import { collection, doc, setDoc, getDocs } from 'firebase/firestore';
 import { auth, db } from '../config/firebase';
-import { Snowflake, AlertCircle } from 'lucide-react';
+import { Snowflake, AlertCircle, CheckCircle } from 'lucide-react';
 
 const AuthScreen = () => {
   const [isLogin, setIsLogin] = useState(true);
@@ -13,11 +14,13 @@ const AuthScreen = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleAuth = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccessMessage('');
     try {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
@@ -32,6 +35,15 @@ const AuthScreen = () => {
           approved: isFirstUser,
           createdAt: new Date().toISOString(),
         });
+        
+        // Log out immediately so user doesn't get automatic login
+        if (!isFirstUser) {
+          await signOut(auth);
+          setSuccessMessage('Conta criada com sucesso! Aguarde aprovação de um administrador para acessar o app.');
+          setEmail('');
+          setPassword('');
+          setIsLogin(true);
+        }
       }
     } catch (err) {
       setError(
@@ -56,6 +68,13 @@ const AuthScreen = () => {
           <h1 className="text-3xl font-bold text-white mb-2">Ushuaia 2026</h1>
           <p className="text-slate-400">Controle Financeiro Compartilhado</p>
         </div>
+
+        {successMessage && (
+          <div className="p-3 bg-green-500/10 border border-green-500/20 rounded-lg flex items-start gap-2 text-green-400 text-sm mb-4">
+            <CheckCircle size={16} className="mt-0.5 flex-shrink-0" />
+            <span>{successMessage}</span>
+          </div>
+        )}
 
         <form onSubmit={handleAuth} className="space-y-4">
           <div>
@@ -97,7 +116,11 @@ const AuthScreen = () => {
 
         <div className="mt-6 text-center">
           <button
-            onClick={() => setIsLogin(!isLogin)}
+            onClick={() => {
+              setIsLogin(!isLogin);
+              setError('');
+              setSuccessMessage('');
+            }}
             className="text-teal-400 hover:text-teal-300 text-sm font-medium transition"
           >
             {isLogin ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entre'}
