@@ -2,6 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
+@layer components {
+  .input {
+    @apply w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white outline-none focus:border-teal-500;
+  }
+}
+
 /* Hide scrollbar for tabs on mobile */
 .scrollbar-hide {
   -ms-overflow-style: none;

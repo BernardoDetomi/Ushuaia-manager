@@ -1,14 +1,15 @@
 import React, { useState } from 'react';
 import { Trash2, CreditCard, Pencil } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
+import { getExpenseParticipantUids, getExpensePayerUid, getMemberName, getTripMembers } from '../utils/tripFinance';
 
-const ExpenseList = ({ expenses, onDelete, onEdit, settings, canManage = false }) => {
+const ExpenseList = ({ expenses, onDelete, onEdit, trip, canManage = false }) => {
   const [filter, setFilter] = useState('todos');
+  const members = getTripMembers(trip);
 
   const filteredExpenses = expenses.filter((exp) => {
     if (filter === 'todos') return true;
-    if (filter === 'person1') return exp.quem_pagou === 'person1';
-    if (filter === 'person2') return exp.quem_pagou === 'person2';
+    if (filter.startsWith('payer:')) return getExpensePayerUid(exp, members, trip.settings) === filter.slice(6);
     return exp.categoria === filter;
   });
 
@@ -24,8 +25,7 @@ const ExpenseList = ({ expenses, onDelete, onEdit, settings, canManage = false }
           onChange={(e) => setFilter(e.target.value)}
         >
           <option value="todos">Todos os Gastos</option>
-          <option value="person1">Pago por {settings.person1}</option>
-          <option value="person2">Pago por {settings.person2}</option>
+          {members.map((member) => <option key={member.uid} value={`payer:${member.uid}`}>Pago por {member.name}</option>)}
           <option disabled>--- Categorias ---</option>
           <option value="Passagem">Passagem</option>
           <option value="Hospedagem">Hospedagem</option>
@@ -70,11 +70,12 @@ const ExpenseList = ({ expenses, onDelete, onEdit, settings, canManage = false }
                           : 'bg-purple-500/10 text-purple-300'
                       }`}
                     >
-                      {expense.quem_pagou === 'person1' ? settings.person1 : settings.person2}
+                      {getMemberName(getExpensePayerUid(expense, members, trip.settings), members)}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-right text-white font-bold">
                     {formatCurrency(expense.valor_total)}
+                    <div className="text-[10px] text-slate-500 font-normal mt-1">Dividido entre {getExpenseParticipantUids(expense, members, trip.settings).map((uid) => getMemberName(uid, members)).join(', ')}</div>
                   </td>
                   <td className="px-6 py-4 text-center">
                     {canManage ? <div className="flex items-center justify-center gap-1">

@@ -21,6 +21,11 @@ const now = () => new Date().toISOString();
 const displayName = (user) =>
   user?.name || user?.displayName || user?.email?.split('@')[0] || 'Usuário';
 
+async function resolveUser(user) {
+  const profileSnap = await getDoc(doc(db, 'users', user.uid));
+  return profileSnap.exists() ? { ...user, ...profileSnap.data(), uid: user.uid } : user;
+}
+
 export async function findUserByEmail(email) {
   const normalized = email.trim().toLowerCase();
   const snap = await getDocs(query(collection(db, 'users'), where('email', '==', normalized)));
@@ -29,20 +34,22 @@ export async function findUserByEmail(email) {
 }
 
 export async function createTrip(user, name, startDate = '') {
+  const resolvedUser = await resolveUser(user);
   const ref = await addDoc(collection(db, 'trips'), {
     name: name.trim(),
     startDate: startDate || null,
     ownerUid: user.uid,
     memberUids: [user.uid],
-    memberProfiles: [{ uid: user.uid, email: user.email, name: displayName(user) }],
-    settings: { person1: displayName(user), person2: 'Parceiro/a' },
+    memberProfiles: [{ uid: user.uid, email: user.email, name: displayName(resolvedUser) }],
+    settings: { person1: displayName(resolvedUser), person2: 'Parceiro/a' },
     createdAt: now(),
   });
   return ref.id;
 }
 
 export async function createSplit(user, name, type = 'mensal') {
-  const participant = displayName(user);
+  const resolvedUser = await resolveUser(user);
+  const participant = displayName(resolvedUser);
   const ref = await addDoc(collection(db, 'split_groups'), {
     name: name.trim(),
     type,
@@ -91,6 +98,7 @@ export async function createInviteLink(resourceType, resource) {
 }
 
 export async function requestAccessFromLink(token, user) {
+  const resolvedUser = await resolveUser(user);
   const linkSnap = await getDoc(doc(db, 'invite_links', token));
   if (!linkSnap.exists() || linkSnap.data().active !== true) throw new Error('invalid-link');
   const invite = linkSnap.data();
@@ -106,7 +114,7 @@ export async function requestAccessFromLink(token, user) {
       ownerUid: invite.ownerUid,
       userUid: user.uid,
       userEmail: user.email,
-      userName: displayName(user),
+      userName: displayName(resolvedUser),
       status: 'pending',
       createdAt: now(),
     });

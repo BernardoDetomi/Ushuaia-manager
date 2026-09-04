@@ -23,7 +23,6 @@ const TripWorkspace = ({ trip, user, onBack, openSettingsSignal = 0 }) => {
   const [showSettings, setShowSettings] = useState(false);
   const [editingExpense, setEditingExpense] = useState(null);
   const canManage = trip.ownerUid === user.uid;
-  const settings = trip.settings || { person1: 'Eu', person2: 'Parceiro/a' };
 
   useEffect(() => {
     if (openSettingsSignal > 0) setShowSettings(true);
@@ -40,8 +39,6 @@ const TripWorkspace = ({ trip, user, onBack, openSettingsSignal = 0 }) => {
     if (!canManage) return;
     if (confirm('Tem certeza que deseja excluir este gasto?')) await deleteDoc(doc(db, 'trips', trip.id, 'expenses', id));
   };
-
-  const saveSettings = (newSettings) => updateDoc(doc(db, 'trips', trip.id), { settings: newSettings });
 
   const tabs = [
     ['dashboard', 'Visão Geral'],
@@ -65,14 +62,14 @@ const TripWorkspace = ({ trip, user, onBack, openSettingsSignal = 0 }) => {
         ) : null}
       </div>
 
-      {activeTab === 'dashboard' && <><SummaryCards expenses={expenses} settings={settings} /><ChartsSection expenses={expenses} settings={settings} /><ExpenseList expenses={expenses} onDelete={removeExpense} onEdit={(expense) => { if (canManage) { setEditingExpense(expense); setShowExpenseForm(true); } }} settings={settings} canManage={canManage} /></>}
-      {activeTab === 'monthly' && <MonthlyView expenses={expenses} settings={settings} tripId={trip.id} canManage={canManage} />}
+      {activeTab === 'dashboard' && <><SummaryCards expenses={expenses} trip={trip} /><ChartsSection expenses={expenses} trip={trip} /><ExpenseList expenses={expenses} onDelete={removeExpense} onEdit={(expense) => { if (canManage) { setEditingExpense(expense); setShowExpenseForm(true); } }} trip={trip} canManage={canManage} /></>}
+      {activeTab === 'monthly' && <MonthlyView expenses={expenses} trip={trip} canManage={canManage} />}
       {activeTab === 'activities' && <ActivitiesList activities={activities} tripId={trip.id} canManage={canManage} />}
-      {activeTab === 'checklist' && <PackingChecklist items={checklist} settings={settings} tripId={trip.id} user={user} canManage={canManage} />}
+      {activeTab === 'checklist' && <PackingChecklist items={checklist} trip={trip} user={user} canManage={canManage} />}
 
-      {showExpenseForm && <ExpenseForm onClose={() => { setShowExpenseForm(false); setEditingExpense(null); }} settings={settings} editingExpense={editingExpense} tripId={trip.id} user={user} />}
+      {showExpenseForm && <ExpenseForm onClose={() => { setShowExpenseForm(false); setEditingExpense(null); }} editingExpense={editingExpense} trip={trip} user={user} />}
       {showActivityForm && <ActivityForm onClose={() => setShowActivityForm(false)} tripId={trip.id} user={user} />}
-      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} settings={settings} onSave={saveSettings} trip={trip} user={user} />}
+      {showSettings && <SettingsModal onClose={() => setShowSettings(false)} trip={trip} user={user} />}
     </main>
   );
 };

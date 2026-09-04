@@ -1,79 +1,79 @@
-import React, { useState } from 'react';
-import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
+import React, { useMemo, useState } from 'react';
+import { addDoc, collection, doc, updateDoc } from 'firebase/firestore';
+import { Check, Pencil, Plus, X } from 'lucide-react';
 import { db } from '../config/firebase';
-import { Plus, Pencil } from 'lucide-react';
+import { getExpenseParticipantUids, getExpensePayerUid, getTripMembers } from '../utils/tripFinance';
 
-const ExpenseForm = ({ onClose, settings, editingExpense, tripId, user }) => {
-  const expensesRef = collection(db, 'trips', tripId, 'expenses');
-  const isSplit = false;
-  const isEditing = !!editingExpense;
-  const todayStr = new Date().toISOString().split('T')[0];
+const categories = ['Passagem', 'Hospedagem', 'Alimentação', 'Passeios', 'Transporte', 'Presentes', 'Outros'];
+const paymentMethods = ['Cartão de Crédito', 'Cartão de Débito', 'Pix', 'Dinheiro', 'Wise/Nomad'];
+
+const ExpenseForm = ({ onClose, editingExpense, trip, user }) => {
+  const members = useMemo(() => getTripMembers(trip), [trip]);
+  const settings = trip.settings || {};
+  const isEditing = Boolean(editingExpense);
+  const today = new Date().toISOString().split('T')[0];
+  const initialParticipants = editingExpense
+    ? getExpenseParticipantUids(editingExpense, members, settings)
+    : members.map((member) => member.uid);
 
   const [formData, setFormData] = useState({
     description: editingExpense?.descricao || '',
     category: editingExpense?.categoria || 'Alimentação',
     value: editingExpense?.valor_total?.toString() || '',
-    payer: editingExpense?.quem_pagou || 'person1',
+    payerUid: editingExpense ? getExpensePayerUid(editingExpense, members, settings) : user.uid,
+    splitBetweenUids: initialParticipants,
     method: editingExpense?.forma_pagamento || 'Cartão de Crédito',
     cardName: editingExpense?.nome_cartao || '',
     cardDueDate: editingExpense?.dia_vencimento?.toString() || '',
-    purchaseDate: editingExpense ? (editingExpense.data?.split('T')[0] || todayStr) : todayStr,
+    purchaseDate: editingExpense?.data?.split('T')[0] || today,
     isInstallment: editingExpense?.parcelado || false,
     installmentsCount: editingExpense?.detalhes_parcela?.count?.toString() || '2',
     firstInstallmentValue: editingExpense?.detalhes_parcela?.firstValue?.toString() || '',
   });
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+  const toggleParticipant = (uid) => {
+    setFormData((current) => ({
+      ...current,
+      splitBetweenUids: current.splitBetweenUids.includes(uid)
+        ? current.splitBetweenUids.filter((item) => item !== uid)
+        : [...current.splitBetweenUids, uid],
+    }));
+  };
+
+  const submit = async (event) => {
+    event.preventDefault();
+    const total = Number(formData.value);
+    if (!formData.payerUid || !formData.splitBetweenUids.length || total <= 0) return;
+    const count = formData.isInstallment ? Number(formData.installmentsCount) : 1;
+    let installmentDetails = null;
+    if (formData.isInstallment) {
+      installmentDetails = formData.firstInstallmentValue
+        ? { count, firstValue: Number(formData.firstInstallmentValue), remainingValue: (total - Number(formData.firstInstallmentValue)) / (count - 1) }
+        : { count, valuePerMonth: total / count };
+    }
+    const equalShare = total / formData.splitBetweenUids.length;
+    const data = {
+      descricao: formData.description.trim(),
+      categoria: formData.category,
+      valor_total: total,
+      quem_pagou: formData.payerUid,
+      paidByUid: formData.payerUid,
+      splitBetweenUids: formData.splitBetweenUids,
+      splitShares: Object.fromEntries(formData.splitBetweenUids.map((uid) => [uid, equalShare])),
+      forma_pagamento: formData.method,
+      nome_cartao: formData.cardName.trim(),
+      dia_vencimento: formData.method === 'Cartão de Crédito' && formData.cardDueDate ? Number(formData.cardDueDate) : null,
+      parcelado: formData.isInstallment,
+      detalhes_parcela: installmentDetails,
+      data: new Date(`${formData.purchaseDate}T12:00:00`).toISOString(),
+    };
     try {
-      let finalValue = parseFloat(formData.value);
-      let installmentDetails = null;
-
-      if (formData.isInstallment) {
-        if (formData.firstInstallmentValue) {
-          installmentDetails = {
-            count: parseInt(formData.installmentsCount),
-            firstValue: parseFloat(formData.firstInstallmentValue),
-            remainingValue:
-              (finalValue - parseFloat(formData.firstInstallmentValue)) /
-              (parseInt(formData.installmentsCount) - 1),
-          };
-        } else {
-          installmentDetails = {
-            count: parseInt(formData.installmentsCount),
-            valuePerMonth: finalValue / parseInt(formData.installmentsCount),
-          };
-        }
-      }
-
-      const expenseData = {
-        descricao: formData.description,
-        categoria: formData.category,
-        valor_total: finalValue,
-        quem_pagou: formData.payer,
-        forma_pagamento: formData.method,
-        nome_cartao: formData.cardName,
-        dia_vencimento:
-          formData.method === 'Cartão de Crédito' ? parseInt(formData.cardDueDate) : null,
-        parcelado: formData.isInstallment,
-        detalhes_parcela: installmentDetails,
-        data: new Date(formData.purchaseDate + 'T12:00:00').toISOString(),
-      };
-
-      if (isEditing) {
-        await updateDoc(doc(db, 'trips', tripId, 'expenses', editingExpense.id), expenseData);
-      } else {
-        await addDoc(expensesRef, {
-          ...expenseData,
-          parcelas_pagas: [],
-          createdBy: user.uid,
-        });
-      }
-
+      if (isEditing) await updateDoc(doc(db, 'trips', trip.id, 'expenses', editingExpense.id), data);
+      else await addDoc(collection(db, 'trips', trip.id, 'expenses'), { ...data, parcelas_pagas: [], createdBy: user.uid });
       onClose();
     } catch (error) {
-      console.error('Erro ao salvar:', error);
-      alert('Erro ao salvar gasto.');
+      console.error('Erro ao salvar gasto:', error);
+      alert('Não foi possível salvar o gasto.');
     }
   };
 
@@ -81,233 +81,44 @@ const ExpenseForm = ({ onClose, settings, editingExpense, tripId, user }) => {
     <div className="fixed inset-0 bg-black/70 backdrop-blur-sm flex items-center justify-center z-50 p-4">
       <div className="bg-slate-800 rounded-2xl w-full max-w-2xl border border-slate-700 shadow-2xl overflow-y-auto max-h-[90vh]">
         <div className="p-6 border-b border-slate-700 flex justify-between items-center">
-          <h2 className="text-xl font-bold text-white flex items-center gap-2">
-            {isEditing ? (
-              <><Pencil className="text-yellow-400" /> Editar Gasto</>
-            ) : (
-              <><Plus className="text-teal-400" /> Novo Gasto</>
-            )}
-          </h2>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
-            ✕
-          </button>
+          <h2 className="text-xl font-bold text-white flex items-center gap-2">{isEditing ? <><Pencil className="text-yellow-400" /> Editar gasto</> : <><Plus className="text-teal-400" /> Novo gasto</>}</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-white"><X /></button>
         </div>
-
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-slate-400 mb-1">Descrição</label>
-              <input
-                required
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
-                placeholder="Ex: Jantar no El Viejo Marino"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400 mb-1">Valor Total (R$)</label>
-              <input
-                type="number"
-                step="0.01"
-                required
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
-                placeholder="0.00"
-                value={formData.value}
-                onChange={(e) => setFormData({ ...formData, value: e.target.value })}
-              />
-            </div>
+        <form onSubmit={submit} className="p-6 space-y-5">
+          <div className="grid md:grid-cols-2 gap-4">
+            <Field label="Descrição"><input required value={formData.description} onChange={(event) => setFormData({ ...formData, description: event.target.value })} className="input" placeholder="Ex: Hospedagem" /></Field>
+            <Field label="Valor total (R$)"><input required type="number" min="0.01" step="0.01" value={formData.value} onChange={(event) => setFormData({ ...formData, value: event.target.value })} className="input" placeholder="0,00" /></Field>
+            <Field label="Data da compra"><input required type="date" value={formData.purchaseDate} onChange={(event) => setFormData({ ...formData, purchaseDate: event.target.value })} className="input" /></Field>
+            <Field label="Categoria"><select value={formData.category} onChange={(event) => setFormData({ ...formData, category: event.target.value })} className="input">{categories.map((item) => <option key={item}>{item}</option>)}</select></Field>
+            <Field label="Quem pagou?"><select required value={formData.payerUid} onChange={(event) => setFormData({ ...formData, payerUid: event.target.value })} className="input">{members.map((member) => <option key={member.uid} value={member.uid}>{member.name}</option>)}</select></Field>
+            <Field label="Forma de pagamento"><select value={formData.method} onChange={(event) => setFormData({ ...formData, method: event.target.value })} className="input">{paymentMethods.map((item) => <option key={item}>{item}</option>)}</select></Field>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-slate-400 mb-1">Data da Compra</label>
-              <input
-                type="date"
-                required
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
-                value={formData.purchaseDate}
-                onChange={(e) => setFormData({ ...formData, purchaseDate: e.target.value })}
-              />
+          <div>
+            <label className="block text-sm text-slate-300 mb-2">Dividir igualmente entre</label>
+            <div className="grid sm:grid-cols-2 gap-2">
+              {members.map((member) => {
+                const selected = formData.splitBetweenUids.includes(member.uid);
+                return <button type="button" key={member.uid} onClick={() => toggleParticipant(member.uid)} className={`flex items-center gap-3 p-3 rounded-lg border text-left ${selected ? 'border-teal-500 bg-teal-500/10 text-white' : 'border-slate-700 bg-slate-900 text-slate-400'}`}><span className={`w-6 h-6 rounded-full flex items-center justify-center ${selected ? 'bg-teal-600' : 'bg-slate-700'}`}>{selected && <Check size={14} />}</span><span><strong className="block text-sm">{member.name}</strong><small className="text-slate-500">{member.email}</small></span></button>;
+              })}
             </div>
-            <div>
-              <label className="block text-sm text-slate-400 mb-1">Categoria</label>
-              <select
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
-                value={formData.category}
-                onChange={(e) => setFormData({ ...formData, category: e.target.value })}
-              >
-                {isSplit ? (
-                  <>
-                    <option>Mercado</option>
-                    <option>Alimentação</option>
-                    <option>Casa</option>
-                    <option>Saúde</option>
-                    <option>Lazer</option>
-                    <option>Transporte</option>
-                    <option>Assinaturas</option>
-                    <option>Pet</option>
-                    <option>Outros</option>
-                  </>
-                ) : (
-                  <>
-                    <option>Passagem</option>
-                    <option>Hospedagem</option>
-                    <option>Alimentação</option>
-                    <option>Passeios</option>
-                    <option>Transporte</option>
-                    <option>Presentes</option>
-                    <option>Outros</option>
-                  </>
-                )}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm text-slate-400 mb-1">Quem Pagou?</label>
-              <div className="flex bg-slate-900 rounded-lg p-1 border border-slate-700">
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, payer: 'person1' })}
-                  className={`flex-1 py-2 rounded-md text-sm font-medium transition ${
-                    formData.payer === 'person1'
-                      ? 'bg-teal-600 text-white'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {settings.person1}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setFormData({ ...formData, payer: 'person2' })}
-                  className={`flex-1 py-2 rounded-md text-sm font-medium transition ${
-                    formData.payer === 'person2'
-                      ? 'bg-purple-600 text-white'
-                      : 'text-slate-400 hover:text-white'
-                  }`}
-                >
-                  {settings.person2}
-                </button>
-              </div>
-            </div>
+            {!formData.splitBetweenUids.length && <p className="text-xs text-red-400 mt-2">Selecione pelo menos uma pessoa.</p>}
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm text-slate-400 mb-1">Forma de Pagamento</label>
-              <select
-                className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
-                value={formData.method}
-                onChange={(e) => setFormData({ ...formData, method: e.target.value })}
-              >
-                <option>Cartão de Crédito</option>
-                <option>Cartão de Débito</option>
-                <option>Pix</option>
-                <option>Dinheiro</option>
-                <option>Wise/Nomad</option>
-              </select>
-            </div>
-            {formData.method === 'Cartão de Crédito' && (
-              <>
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Apelido do Cartão</label>
-                  <input
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
-                    placeholder="Ex: Nubank Roxo"
-                    value={formData.cardName}
-                    onChange={(e) => setFormData({ ...formData, cardName: e.target.value })}
-                  />
-                </div>
-                <div className="col-span-1 md:col-span-2">
-                  <label className="block text-sm text-slate-400 mb-1">
-                    Dia de Vencimento da Fatura
-                  </label>
-                  <input
-                    type="number"
-                    min="1"
-                    max="31"
-                    className="w-full bg-slate-900 border border-slate-700 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
-                    placeholder="Ex: 5"
-                    value={formData.cardDueDate}
-                    onChange={(e) => setFormData({ ...formData, cardDueDate: e.target.value })}
-                  />
-                  <p className="text-xs text-slate-500 mt-1">
-                    Usado para calcular em qual mês cai a primeira parcela.
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
+          {formData.method === 'Cartão de Crédito' && <div className="grid md:grid-cols-2 gap-4"><Field label="Apelido do cartão"><input value={formData.cardName} onChange={(event) => setFormData({ ...formData, cardName: event.target.value })} className="input" /></Field><Field label="Dia de vencimento"><input type="number" min="1" max="31" value={formData.cardDueDate} onChange={(event) => setFormData({ ...formData, cardDueDate: event.target.value })} className="input" /></Field></div>}
 
           <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-            <div className="flex items-center gap-3 mb-4">
-              <input
-                type="checkbox"
-                id="parcelado"
-                className="w-5 h-5 accent-teal-500"
-                checked={formData.isInstallment}
-                onChange={(e) => setFormData({ ...formData, isInstallment: e.target.checked })}
-              />
-              <label htmlFor="parcelado" className="text-white font-medium cursor-pointer">
-                Compra Parcelada?
-              </label>
-            </div>
-
-            {formData.isInstallment && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">Nº Parcelas</label>
-                  <input
-                    type="number"
-                    min="2"
-                    className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
-                    value={formData.installmentsCount}
-                    onChange={(e) =>
-                      setFormData({ ...formData, installmentsCount: e.target.value })
-                    }
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm text-slate-400 mb-1">
-                    Valor da 1ª Parcela (Opcional)
-                  </label>
-                  <input
-                    type="number"
-                    step="0.01"
-                    className="w-full bg-slate-800 border border-slate-600 rounded-lg p-3 text-white focus:border-teal-500 outline-none"
-                    placeholder="Se diferente das outras"
-                    value={formData.firstInstallmentValue}
-                    onChange={(e) =>
-                      setFormData({ ...formData, firstInstallmentValue: e.target.value })
-                    }
-                  />
-                </div>
-              </div>
-            )}
+            <label className="flex items-center gap-3 text-white"><input type="checkbox" checked={formData.isInstallment} onChange={(event) => setFormData({ ...formData, isInstallment: event.target.checked })} className="w-5 h-5 accent-teal-500" /> Compra parcelada?</label>
+            {formData.isInstallment && <div className="grid md:grid-cols-2 gap-4 mt-4"><Field label="Número de parcelas"><input required type="number" min="2" value={formData.installmentsCount} onChange={(event) => setFormData({ ...formData, installmentsCount: event.target.value })} className="input" /></Field><Field label="Valor da primeira parcela (opcional)"><input type="number" min="0" step="0.01" value={formData.firstInstallmentValue} onChange={(event) => setFormData({ ...formData, firstInstallmentValue: event.target.value })} className="input" /></Field></div>}
           </div>
 
-          <div className="pt-4 flex gap-3">
-            <button
-              type="button"
-              onClick={onClose}
-              className="flex-1 bg-slate-700 hover:bg-slate-600 text-white font-medium py-3 rounded-lg transition"
-            >
-              Cancelar
-            </button>
-            <button
-              type="submit"
-              className={`flex-1 font-bold py-3 rounded-lg transition shadow-lg text-white ${
-                isEditing
-                  ? 'bg-yellow-600 hover:bg-yellow-500 shadow-yellow-900/50'
-                  : 'bg-teal-600 hover:bg-teal-500 shadow-teal-900/50'
-              }`}
-            >
-              {isEditing ? 'Salvar Alterações' : 'Adicionar'}
-            </button>
-          </div>
+          <div className="flex gap-3"><button type="button" onClick={onClose} className="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-3 rounded-lg">Cancelar</button><button disabled={!formData.splitBetweenUids.length} className="flex-1 bg-teal-600 hover:bg-teal-500 disabled:opacity-50 text-white font-bold py-3 rounded-lg">{isEditing ? 'Salvar alterações' : 'Adicionar'}</button></div>
         </form>
       </div>
     </div>
   );
 };
+
+const Field = ({ label, children }) => <label className="block"><span className="block text-sm text-slate-400 mb-1">{label}</span>{children}</label>;
 
 export default ExpenseForm;

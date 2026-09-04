@@ -7,6 +7,7 @@ import {
   doc,
 } from 'firebase/firestore';
 import { db } from '../config/firebase';
+import { getTripMembers } from '../utils/tripFinance';
 import {
   Luggage,
   Plus,
@@ -20,7 +21,7 @@ import {
   ShoppingBag,
 } from 'lucide-react';
 
-const PersonSection = ({ personName, items, color, tripId, user, canManage }) => {
+const PersonSection = ({ personName, personUid, items, color, tripId, user, canManage }) => {
   const [newItem, setNewItem] = useState('');
   const [newQty, setNewQty] = useState('');
   const [editingId, setEditingId] = useState(null);
@@ -31,6 +32,7 @@ const PersonSection = ({ personName, items, color, tripId, user, canManage }) =>
     if (!newItem.trim()) return;
     await addDoc(collection(db, 'trips', tripId, 'checklist'), {
       person: personName,
+      personUid,
       item: newItem.trim(),
       quantity: newQty.trim() || '1',
       handBag: false,
@@ -312,7 +314,7 @@ const PersonSection = ({ personName, items, color, tripId, user, canManage }) =>
   );
 };
 
-const PackingChecklist = ({ items, settings, tripId, user, canManage }) => {
+const PackingChecklist = ({ items, trip, user, canManage }) => {
   const allPacked = (i) => i.handBag && i.suitcase;
 
   const sortItems = (list) =>
@@ -323,21 +325,14 @@ const PackingChecklist = ({ items, settings, tripId, user, canManage }) => {
       return a.createdAt?.localeCompare(b.createdAt) || 0;
     });
 
-  // Agrupar por person — encontrar quais persons existem nos dados
-  const personNames = [...new Set(items.map((i) => i.person).filter(Boolean))];
-
-  // Mapear para settings (person1 primeiro, person2 segundo, resto depois)
-  const orderedPersons = [];
-  if (personNames.includes(settings.person1)) {
-    orderedPersons.push(settings.person1);
-  }
-  if (personNames.includes(settings.person2)) {
-    orderedPersons.push(settings.person2);
-  }
-  // Adicionar qualquer pessoa que exista nos dados mas não bate com settings
-  personNames.forEach((p) => {
-    if (!orderedPersons.includes(p)) orderedPersons.push(p);
-  });
+  const members = getTripMembers(trip);
+  const knownNames = new Set(members.map((member) => member.name));
+  const legacyPeople = [...new Set(
+    items
+      .filter((item) => !item.personUid && item.person && !knownNames.has(item.person))
+      .map((item) => item.person)
+  )].map((name) => ({ uid: `legacy:${name}`, name, email: '' }));
+  const people = [...members, ...legacyPeople];
 
   const colors = ['teal', 'pink', 'teal', 'pink'];
 
@@ -363,37 +358,18 @@ const PackingChecklist = ({ items, settings, tripId, user, canManage }) => {
 
       {/* Person sections — dinâmico por pessoa encontrada nos dados */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {orderedPersons.map((personName, idx) => (
+        {people.map((person, idx) => (
           <PersonSection
-            key={personName}
-            personName={personName}
-            items={sortItems(items.filter((i) => i.person === personName))}
+            key={person.uid}
+            personName={person.name}
+            personUid={person.uid}
+            items={sortItems(items.filter((item) => item.personUid === person.uid || (!item.personUid && item.person === person.name)))}
             color={colors[idx % colors.length]}
-            tripId={tripId}
+            tripId={trip.id}
             user={user}
             canManage={canManage}
           />
         ))}
-        {orderedPersons.length === 0 && (
-          <div className="col-span-2 grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <PersonSection
-              personName={settings.person1}
-              items={[]}
-              color="teal"
-              tripId={tripId}
-              user={user}
-              canManage={canManage}
-            />
-            <PersonSection
-              personName={settings.person2}
-              items={[]}
-              color="pink"
-              tripId={tripId}
-              user={user}
-              canManage={canManage}
-            />
-          </div>
-        )}
       </div>
     </div>
   );

@@ -34,6 +34,8 @@ A aplicação ainda está em desenvolvimento e há melhorias planejadas, mas os 
 - Controle de gastos com passagens, hotéis, alimentação, transporte e passeios
 - Registro de compras à vista ou parceladas
 - Organização de pagamentos por mês e por pessoa
+- Participantes financeiros ilimitados por viagem
+- Escolha de quem pagou e de quais membros participam de cada gasto
 - Acompanhamento de parcelas pagas e pendentes
 - Dashboard com resumo financeiro e gráficos
 - Cadastro de passeios e atividades
@@ -54,13 +56,15 @@ A aplicação ainda está em desenvolvimento e há melhorias planejadas, mas os 
 
 ### Colaboração e acesso
 
-- Autenticação por e-mail e senha com Firebase Authentication
+- Autenticação por e-mail/senha ou conta Google com Firebase Authentication
+- Recuperação de senha por e-mail
 - Viagens e Splits privados, visíveis somente para seus membros
 - Convite direto pelo e-mail de um usuário cadastrado
 - Link compartilhável com solicitação de entrada
 - Aprovação de solicitações pelo líder
 - Membros podem visualizar e criar registros
 - Apenas o líder pode editar, excluir e administrar acessos
+- Formulário de ajuda, sugestões e bugs com envio por e-mail
 
 ## Tecnologias
 
@@ -122,6 +126,11 @@ VITE_FIREBASE_STORAGE_BUCKET=your_project.firebasestorage.app
 VITE_FIREBASE_MESSAGING_SENDER_ID=your_messaging_sender_id
 VITE_FIREBASE_APP_ID=your_app_id
 VITE_FIREBASE_MEASUREMENT_ID=your_measurement_id
+
+# Variáveis usadas somente pela função serverless
+RESEND_API_KEY=re_your_resend_api_key
+RESEND_FROM_EMAIL=Ushuaia Manager <onboarding@resend.dev>
+FEEDBACK_TO_EMAIL=your_contact_email@example.com
 ```
 
 No Firebase Console, habilite o provedor **E-mail/senha** em **Authentication → Sign-in method** e crie um banco do Cloud Firestore.
@@ -146,6 +155,23 @@ npx firebase-tools deploy --only firestore:rules --project seu-project-id
 ```
 
 No PowerShell com execução de scripts bloqueada, substitua `npx` por `npx.cmd`.
+
+## Formulário de contato com Resend
+
+O botão **Ajuda** do cabeçalho envia as mensagens por meio da função serverless
+[`api/feedback.js`](api/feedback.js). Configure `RESEND_API_KEY`,
+`RESEND_FROM_EMAIL` e `FEEDBACK_TO_EMAIL` nas variáveis de ambiente da Vercel.
+
+Para produção, utilize em `RESEND_FROM_EMAIL` um remetente pertencente a um
+domínio verificado no Resend. O remetente `onboarding@resend.dev` é indicado
+apenas para testes e possui restrições de destinatário.
+
+O servidor Vite (`npm run dev`) não executa funções da Vercel. Para testar o
+envio completo localmente, use a Vercel CLI:
+
+```bash
+npx vercel dev
+```
 
 ## Build e deploy
 
@@ -190,7 +216,7 @@ Ushuaia-manager/
 - [x] Convites por e-mail e link
 - [x] Permissões de líder e membro
 - [ ] Melhorar o gerenciamento de participantes
-- [ ] Adicionar recuperação de senha
+- [x] Adicionar recuperação de senha
 - [ ] Criar notificações para convites e solicitações
 - [ ] Ampliar testes automatizados
 - [ ] Otimizar o carregamento e a divisão do bundle

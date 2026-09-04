@@ -5,6 +5,7 @@ import { Link, LogOut } from 'lucide-react';
 import { auth, db } from './config/firebase';
 import AuthScreen from './components/AuthScreen';
 import Header from './components/Header';
+import FeedbackModal from './components/FeedbackModal';
 import Onboarding from './components/Onboarding';
 import TripList from './components/TripList';
 import TripWorkspace from './components/TripWorkspace';
@@ -22,6 +23,7 @@ export default function App() {
   const [selectedTripId, setSelectedTripId] = useState(null);
   const [settingsSignal, setSettingsSignal] = useState(0);
   const [inviteStatus, setInviteStatus] = useState(null);
+  const [showFeedback, setShowFeedback] = useState(false);
 
   useEffect(() => onAuthStateChanged(auth, (currentUser) => {
     setUser(currentUser);
@@ -37,7 +39,7 @@ export default function App() {
     const normalizedEmail = user.email?.toLowerCase();
     setDoc(doc(db, 'users', user.uid), {
       email: normalizedEmail,
-      name: user.displayName || normalizedEmail?.split('@')[0],
+      ...(user.displayName ? { name: user.displayName } : {}),
       approved: true,
       lastLoginAt: new Date().toISOString(),
     }, { merge: true })
@@ -132,6 +134,7 @@ export default function App() {
     <div className="min-h-screen bg-slate-900 text-slate-200 pb-12 font-sans">
       <Header
         onOpenSettings={selectedTrip ? () => setSettingsSignal((value) => value + 1) : null}
+        onOpenFeedback={() => setShowFeedback(true)}
         onLogout={() => signOut(auth)}
         appMode={appMode}
         onToggleMode={(mode) => { setAppMode(mode); setSelectedTripId(null); }}
@@ -143,6 +146,7 @@ export default function App() {
       ) : (
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"><SplitMain user={user} groups={groups} /></main>
       )}
+      {showFeedback && <FeedbackModal user={user} onClose={() => setShowFeedback(false)} />}
     </div>
   );
 }
