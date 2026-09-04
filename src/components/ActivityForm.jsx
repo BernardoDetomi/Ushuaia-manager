@@ -3,7 +3,7 @@ import { collection, addDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { MapPin } from 'lucide-react';
 
-const ActivityForm = ({ onClose }) => {
+const ActivityForm = ({ onClose, tripId, user }) => {
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -18,7 +18,7 @@ const ActivityForm = ({ onClose }) => {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      await addDoc(collection(db, 'activities'), {
+      await addDoc(collection(db, 'trips', tripId, 'activities'), {
         nome: formData.name,
         descricao: formData.description,
         custo_estimado: formData.estimatedCost ? parseFloat(formData.estimatedCost) : 0,
@@ -29,6 +29,7 @@ const ActivityForm = ({ onClose }) => {
         notas: formData.notes,
         status: 'pendente',
         criado_em: new Date().toISOString(),
+        createdBy: user.uid,
       });
       onClose();
     } catch (error) {

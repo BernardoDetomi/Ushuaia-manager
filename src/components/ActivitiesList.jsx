@@ -16,10 +16,11 @@ const PRIORITY_CONFIG = {
   baixa: { label: '💭 Se der tempo', color: 'border-slate-600' },
 };
 
-const ActivitiesList = ({ activities }) => {
+const ActivitiesList = ({ activities, tripId, canManage }) => {
   const handleStatusChange = async (activityId, newStatus) => {
+    if (!canManage) return;
     try {
-      const docRef = doc(db, 'activities', activityId);
+      const docRef = doc(db, 'trips', tripId, 'activities', activityId);
       await updateDoc(docRef, { status: newStatus });
     } catch (err) {
       console.error('Erro ao atualizar status:', err);
@@ -28,7 +29,7 @@ const ActivitiesList = ({ activities }) => {
 
   const handleDelete = async (id) => {
     if (confirm('Tem certeza que deseja excluir este passeio?')) {
-      await deleteDoc(doc(db, 'activities', id));
+      await deleteDoc(doc(db, 'trips', tripId, 'activities', id));
     }
   };
 
@@ -84,13 +85,13 @@ const ActivitiesList = ({ activities }) => {
                       <p className="text-slate-400 text-sm mt-1">{activity.descricao}</p>
                     )}
                   </div>
-                  <button
+                  {canManage && <button
                     onClick={() => handleDelete(activity.id)}
                     className="text-slate-600 hover:text-red-400 p-1 rounded transition opacity-0 group-hover:opacity-100"
                     title="Excluir"
                   >
                     <Trash2 size={16} />
-                  </button>
+                  </button>}
                 </div>
 
                 {/* Info tags */}
@@ -124,6 +125,7 @@ const ActivitiesList = ({ activities }) => {
                 {/* Footer: status + link */}
                 <div className="flex items-center justify-between pt-2 border-t border-slate-700/50">
                   <select
+                    disabled={!canManage}
                     value={activity.status}
                     onChange={(e) => handleStatusChange(activity.id, e.target.value)}
                     className={`text-xs font-medium px-2 py-1 rounded cursor-pointer outline-none border-0 ${status.color}`}

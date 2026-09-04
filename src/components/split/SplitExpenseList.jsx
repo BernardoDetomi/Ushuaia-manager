@@ -3,7 +3,7 @@ import { Edit, Trash2, Search, RefreshCw, Receipt } from 'lucide-react';
 import { formatCurrency } from '../../utils/formatCurrency';
 import { getExpenseSplits, SPLIT_CATEGORIES } from './splitUtils';
 
-const SplitExpenseList = ({ expenses, group, onDelete, onEdit }) => {
+const SplitExpenseList = ({ expenses, group, onDelete, onEdit, canManage }) => {
   const [filterCategory, setFilterCategory] = useState('all');
   const [filterPerson, setFilterPerson] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -158,7 +158,7 @@ const SplitExpenseList = ({ expenses, group, onDelete, onEdit }) => {
                   </div>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-white font-bold">{formatCurrency(exp.amount)}</span>
-                    {!closed && (
+                    {!closed && canManage && (
                       <div className="flex gap-1">
                         <button
                           onClick={() => onEdit(exp)}

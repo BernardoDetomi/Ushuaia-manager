@@ -9,15 +9,15 @@ const Header = ({ onOpenSettings, onLogout, appMode, onToggleMode }) => {
           {/* Mode Switch */}
           <div className="flex bg-slate-900 p-1 rounded-xl border border-slate-700">
             <button
-              onClick={() => onToggleMode('ushuaia')}
+              onClick={() => onToggleMode('trips')}
               className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
-                appMode === 'ushuaia'
+                appMode === 'trips'
                   ? 'bg-teal-600 text-white shadow-lg'
                   : 'text-slate-500 hover:text-slate-300'
               }`}
             >
               <Snowflake size={16} />
-              <span className="hidden sm:inline">Ushuaia</span>
+              <span className="hidden sm:inline">Viagens</span>
             </button>
             <button
               onClick={() => onToggleMode('split')}
@@ -34,13 +34,13 @@ const Header = ({ onOpenSettings, onLogout, appMode, onToggleMode }) => {
         </div>
 
         <div className="flex items-center gap-4">
-          <button
+          {onOpenSettings && <button
             onClick={onOpenSettings}
             className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-full transition"
             title="Configurações"
           >
             <Settings size={20} />
-          </button>
+          </button>}
           <button
             onClick={onLogout}
             className="p-2 text-slate-400 hover:text-white hover:bg-slate-700 rounded-full transition"

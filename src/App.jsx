@@ -1,299 +1,147 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { onAuthStateChanged, signOut } from 'firebase/auth';
-import {
-  collection,
-  query,
-  orderBy,
-  onSnapshot,
-  deleteDoc,
-  doc,
-  setDoc,
-} from 'firebase/firestore';
+import { collection, doc, onSnapshot, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { Link, LogOut } from 'lucide-react';
 import { auth, db } from './config/firebase';
-import { Plus, MapPin } from 'lucide-react';
-
 import AuthScreen from './components/AuthScreen';
 import Header from './components/Header';
-import Countdown from './components/Countdown';
-import SummaryCards from './components/SummaryCards';
-import ChartsSection from './components/ChartsSection';
-import ExpenseList from './components/ExpenseList';
-import MonthlyView from './components/MonthlyView';
-import ExpenseForm from './components/ExpenseForm';
-import SettingsModal from './components/SettingsModal';
-import ActivitiesList from './components/ActivitiesList';
-import ActivityForm from './components/ActivityForm';
-import PendingApproval from './components/PendingApproval';
-import PackingChecklist from './components/PackingChecklist';
+import Onboarding from './components/Onboarding';
+import TripList from './components/TripList';
+import TripWorkspace from './components/TripWorkspace';
 import SplitMain from './components/split/SplitMain';
+import { migrateLegacyData, requestAccessFromLink } from './services/workspaces';
 
 export default function App() {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [showForm, setShowForm] = useState(false);
-  const [editingExpense, setEditingExpense] = useState(null);
-  const [showActivityForm, setShowActivityForm] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
-  const [activeTab, setActiveTab] = useState('dashboard');
-  const [expenses, setExpenses] = useState([]);
-  const [activities, setActivities] = useState([]);
-  const [checklistItems, setChecklistItems] = useState([]);
-  const [settings, setSettings] = useState({ person1: 'Eu', person2: 'Namorada' });
-  const [isApproved, setIsApproved] = useState(null); // null = loading, true/false
+  const [authLoading, setAuthLoading] = useState(true);
+  const [resourcesLoading, setResourcesLoading] = useState(true);
+  const [migrationReady, setMigrationReady] = useState(false);
+  const [trips, setTrips] = useState([]);
+  const [groups, setGroups] = useState([]);
+  const [appMode, setAppMode] = useState('trips');
+  const [selectedTripId, setSelectedTripId] = useState(null);
+  const [settingsSignal, setSettingsSignal] = useState(0);
+  const [inviteStatus, setInviteStatus] = useState(null);
 
-  // App mode: 'ushuaia' or 'split'
-  const [appMode, setAppMode] = useState('ushuaia');
+  useEffect(() => onAuthStateChanged(auth, (currentUser) => {
+    setUser(currentUser);
+    setAuthLoading(false);
+  }), []);
 
-  // Auth Listener
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-      if (!currentUser) setIsApproved(null);
-      setLoading(false);
-    });
-    return () => unsubscribe();
-  }, []);
-
-  // Sync Data (Expenses & Settings)
   useEffect(() => {
     if (!user) {
-      setExpenses([]);
-      setActivities([]);
-      setChecklistItems([]);
-      setIsApproved(null);
+      setMigrationReady(false);
       return;
     }
-
-    // Check user approval status
-    const userDocRef = doc(db, 'users', user.uid);
-    const unsubUser = onSnapshot(userDocRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setIsApproved(docSnap.data().approved === true);
-      } else {
-        // User doc doesn't exist (old user before approval system) — auto-approve
-        setDoc(userDocRef, {
-          email: user.email,
-          approved: true,
-          createdAt: new Date().toISOString(),
-        });
-        setIsApproved(true);
-      }
-    });
-
-    // Usando coleção pública para compartilhar dados entre contas diferentes
-    const expenseQuery = query(
-      collection(db, 'expenses'),
-      orderBy('data', 'desc')
-    );
-
-    const unsubExpenses = onSnapshot(expenseQuery, (snapshot) => {
-      const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setExpenses(docs);
-    });
-
-    // Load Activities
-    const activitiesQuery = query(
-      collection(db, 'activities'),
-      orderBy('criado_em', 'desc')
-    );
-
-    const unsubActivities = onSnapshot(activitiesQuery, (snapshot) => {
-      const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-      setActivities(docs);
-    });
-
-    // Load Checklist Items (sem orderBy — o componente já ordena client-side)
-    const unsubChecklist = onSnapshot(
-      collection(db, 'checklist'),
-      (snapshot) => {
-        const docs = snapshot.docs.map((d) => ({ id: d.id, ...d.data() }));
-        setChecklistItems(docs);
-      },
-      (err) => console.error('Checklist listener error:', err)
-    );
-
-    // Load Settings
-    const settingsRef = doc(db, 'settings', 'config');
-    const unsubSettings = onSnapshot(settingsRef, (docSnap) => {
-      if (docSnap.exists()) {
-        setSettings(docSnap.data());
-      } else {
-        setDoc(settingsRef, { person1: 'Eu', person2: 'Ela' });
-      }
-    });
-
-    return () => {
-      unsubUser();
-      unsubExpenses();
-      unsubActivities();
-      unsubChecklist();
-      unsubSettings();
-    };
+    setMigrationReady(false);
+    const normalizedEmail = user.email?.toLowerCase();
+    setDoc(doc(db, 'users', user.uid), {
+      email: normalizedEmail,
+      name: user.displayName || normalizedEmail?.split('@')[0],
+      approved: true,
+      lastLoginAt: new Date().toISOString(),
+    }, { merge: true })
+      .then(() => migrateLegacyData(user))
+      .catch((error) => console.error('Legacy migration failed:', error))
+      .finally(() => setMigrationReady(true));
   }, [user]);
 
-  const saveSettings = async (newSettings) => {
-    await setDoc(
-      doc(db, 'settings', 'config'),
-      newSettings
-    );
-  };
-
-  const handleDelete = async (id) => {
-    if (confirm('Tem certeza que deseja excluir este gasto?')) {
-      await deleteDoc(doc(db, 'expenses', id));
+  useEffect(() => {
+    if (!user) {
+      setTrips([]);
+      setGroups([]);
+      setResourcesLoading(false);
+      return undefined;
     }
-  };
+    if (!migrationReady) return undefined;
 
-  const handleLogout = () => signOut(auth);
+    setResourcesLoading(true);
 
-  if (loading) {
+    let tripsReady = false;
+    let groupsReady = false;
+    const finishLoading = () => {
+      if (tripsReady && groupsReady) setResourcesLoading(false);
+    };
+    const tripsQuery = query(collection(db, 'trips'), where('memberUids', 'array-contains', user.uid));
+    const groupsQuery = query(collection(db, 'split_groups'), where('memberUids', 'array-contains', user.uid));
+    const unsubTrips = onSnapshot(tripsQuery, (snap) => {
+      setTrips(snap.docs.map((item) => ({ id: item.id, ...item.data() })).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
+      tripsReady = true;
+      finishLoading();
+    }, (error) => { console.error(error); tripsReady = true; finishLoading(); });
+    const unsubGroups = onSnapshot(groupsQuery, (snap) => {
+      setGroups(snap.docs.map((item) => ({ id: item.id, ...item.data() })).sort((a, b) => (b.createdAt || '').localeCompare(a.createdAt || '')));
+      groupsReady = true;
+      finishLoading();
+    }, (error) => { console.error(error); groupsReady = true; finishLoading(); });
+    return () => { unsubTrips(); unsubGroups(); };
+  }, [user, migrationReady]);
+
+  useEffect(() => {
+    if (!user) return;
+    const token = new URLSearchParams(window.location.search).get('invite');
+    if (!token) return;
+    let unsubscribeRequest;
+    requestAccessFromLink(token, user)
+      .then((result) => {
+        setInviteStatus(result);
+        if (result.status === 'pending' && result.requestId) {
+          unsubscribeRequest = onSnapshot(doc(db, 'join_requests', result.requestId), (snap) => {
+            if (!snap.exists()) return;
+            const status = snap.data().status;
+            setInviteStatus((current) => ({ ...current, status }));
+            if (status === 'accepted') window.history.replaceState({}, '', window.location.pathname);
+          });
+        }
+        if (result.status === 'member' || result.status === 'accepted') {
+          window.history.replaceState({}, '', window.location.pathname);
+        }
+      })
+      .catch(() => setInviteStatus({ status: 'invalid' }));
+    return () => unsubscribeRequest?.();
+  }, [user]);
+
+  const selectedTrip = useMemo(() => trips.find((trip) => trip.id === selectedTripId), [trips, selectedTripId]);
+  const needsOnboarding = !resourcesLoading && trips.length === 0 && groups.length === 0 && inviteStatus?.status !== 'pending';
+
+  if (authLoading || (user && (!migrationReady || resourcesLoading))) return <div className="min-h-screen bg-slate-900 flex items-center justify-center text-teal-400">Carregando...</div>;
+  if (!user) return <AuthScreen />;
+
+  if (inviteStatus?.status === 'pending' && trips.length === 0 && groups.length === 0) {
     return (
-      <div className="min-h-screen bg-slate-900 flex items-center justify-center text-teal-500">
-        Carregando...
+      <div className="min-h-screen bg-slate-900 flex items-center justify-center p-4 text-slate-200">
+        <div className="max-w-md w-full bg-slate-800 border border-slate-700 rounded-2xl p-8 text-center">
+          <Link className="mx-auto text-teal-400 mb-4" size={36} />
+          <h1 className="text-xl font-bold text-white">Solicitação enviada</h1>
+          <p className="text-slate-400 mt-2">O líder de “{inviteStatus.invite.resourceName}” precisa aprovar sua entrada.</p>
+          <button onClick={() => signOut(auth)} className="mt-6 text-slate-400 hover:text-white inline-flex items-center gap-2"><LogOut size={16} /> Sair</button>
+        </div>
       </div>
     );
   }
 
-  if (!user) return <AuthScreen />;
-
-  if (isApproved === null || isApproved === false) {
-    if (isApproved === null) {
-      return (
-        <div className="min-h-screen bg-slate-900 flex items-center justify-center text-teal-500">
-          Verificando acesso...
-        </div>
-      );
-    }
-    return <PendingApproval />;
+  if (inviteStatus?.status === 'invalid' && trips.length === 0 && groups.length === 0) {
+    window.history.replaceState({}, '', window.location.pathname);
   }
 
-  const handleToggleMode = (mode) => {
-    setAppMode(mode);
-    setShowForm(false);
-    setEditingExpense(null);
-  };
+  if (needsOnboarding) {
+    return <Onboarding user={user} onComplete={() => updateDoc(doc(db, 'users', user.uid), { onboardingCompleted: true })} />;
+  }
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-200 pb-12 font-sans">
       <Header
-        onOpenSettings={() => setShowSettings(true)}
-        onLogout={handleLogout}
+        onOpenSettings={selectedTrip ? () => setSettingsSignal((value) => value + 1) : null}
+        onLogout={() => signOut(auth)}
         appMode={appMode}
-        onToggleMode={handleToggleMode}
+        onToggleMode={(mode) => { setAppMode(mode); setSelectedTripId(null); }}
       />
-
-      {appMode === 'ushuaia' ? (
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <Countdown />
-
-          <div className="flex flex-col md:flex-row justify-between items-center mb-8 gap-4">
-            <div className="flex bg-slate-800 p-1 rounded-xl border border-slate-700 overflow-x-auto max-w-full scrollbar-hide">
-              <button
-                onClick={() => setActiveTab('dashboard')}
-                className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
-                  activeTab === 'dashboard'
-                    ? 'bg-teal-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Visão Geral
-              </button>
-              <button
-                onClick={() => setActiveTab('monthly')}
-                className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
-                  activeTab === 'monthly'
-                    ? 'bg-teal-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Faturas / Mensal
-              </button>
-              <button
-                onClick={() => setActiveTab('activities')}
-                className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
-                  activeTab === 'activities'
-                    ? 'bg-orange-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Passeios
-              </button>
-              <button
-                onClick={() => setActiveTab('checklist')}
-                className={`px-4 sm:px-6 py-2 rounded-lg text-xs sm:text-sm font-bold transition whitespace-nowrap ${
-                  activeTab === 'checklist'
-                    ? 'bg-purple-600 text-white shadow-lg'
-                    : 'text-slate-400 hover:text-white'
-                }`}
-              >
-                Bagagem
-              </button>
-            </div>
-
-            {activeTab === 'activities' ? (
-              <button
-                onClick={() => setShowActivityForm(true)}
-                className="bg-orange-600 hover:bg-orange-500 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-orange-900/40 transition hover:scale-105"
-              >
-                <MapPin size={20} />
-                <span>Novo Passeio</span>
-              </button>
-            ) : activeTab !== 'checklist' ? (
-              <button
-                onClick={() => setShowForm(true)}
-                className="bg-teal-600 hover:bg-teal-500 text-white px-6 py-3 rounded-lg font-bold flex items-center gap-2 shadow-lg shadow-teal-900/40 transition hover:scale-105"
-              >
-                <Plus size={20} />
-                <span>Adicionar Gasto</span>
-              </button>
-            ) : null}
-          </div>
-
-          {activeTab === 'dashboard' && (
-            <div>
-              <SummaryCards expenses={expenses} settings={settings} />
-              <ChartsSection expenses={expenses} settings={settings} />
-              <ExpenseList
-                expenses={expenses}
-                onDelete={handleDelete}
-                onEdit={(exp) => { setEditingExpense(exp); setShowForm(true); }}
-                settings={settings}
-              />
-            </div>
-          )}
-          {activeTab === 'monthly' && (
-            <MonthlyView expenses={expenses} settings={settings} />
-          )}
-          {activeTab === 'activities' && (
-            <ActivitiesList activities={activities} />
-          )}
-          {activeTab === 'checklist' && (
-            <PackingChecklist items={checklistItems} settings={settings} />
-          )}
-        </main>
+      {appMode === 'trips' ? (
+        selectedTrip
+          ? <TripWorkspace trip={selectedTrip} user={user} onBack={() => setSelectedTripId(null)} openSettingsSignal={settingsSignal} />
+          : <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"><TripList trips={trips} user={user} onSelectTrip={setSelectedTripId} /></main>
       ) : (
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-          <SplitMain user={user} settings={settings} />
-        </main>
-      )}
-
-      {/* Modals (Ushuaia) */}
-      {appMode === 'ushuaia' && showForm && (
-        <ExpenseForm
-          onClose={() => { setShowForm(false); setEditingExpense(null); }}
-          settings={settings}
-          editingExpense={editingExpense}
-        />
-      )}
-      {appMode === 'ushuaia' && showActivityForm && (
-        <ActivityForm onClose={() => setShowActivityForm(false)} />
-      )}
-      {showSettings && (
-        <SettingsModal
-          onClose={() => setShowSettings(false)}
-          settings={settings}
-          onSave={saveSettings}
-        />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8"><SplitMain user={user} groups={groups} /></main>
       )}
     </div>
   );

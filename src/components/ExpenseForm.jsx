@@ -3,8 +3,9 @@ import { collection, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../config/firebase';
 import { Plus, Pencil } from 'lucide-react';
 
-const ExpenseForm = ({ onClose, settings, editingExpense, collectionName = 'expenses' }) => {
-  const isSplit = collectionName === 'split_expenses';
+const ExpenseForm = ({ onClose, settings, editingExpense, tripId, user }) => {
+  const expensesRef = collection(db, 'trips', tripId, 'expenses');
+  const isSplit = false;
   const isEditing = !!editingExpense;
   const todayStr = new Date().toISOString().split('T')[0];
 
@@ -60,11 +61,12 @@ const ExpenseForm = ({ onClose, settings, editingExpense, collectionName = 'expe
       };
 
       if (isEditing) {
-        await updateDoc(doc(db, collectionName, editingExpense.id), expenseData);
+        await updateDoc(doc(db, 'trips', tripId, 'expenses', editingExpense.id), expenseData);
       } else {
-        await addDoc(collection(db, collectionName), {
+        await addDoc(expensesRef, {
           ...expenseData,
           parcelas_pagas: [],
+          createdBy: user.uid,
         });
       }
 

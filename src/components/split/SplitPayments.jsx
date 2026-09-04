@@ -17,9 +17,11 @@ const SplitPayments = ({
   debtInfo,
   onPayDebt,
   onDeletePayment,
+  canManage,
   showForm,
   onCloseForm,
   preset,
+  user,
 }) => {
   const [from, setFrom] = useState('');
   const [to, setTo] = useState('');
@@ -58,6 +60,7 @@ const SplitPayments = ({
         date,
         notes: notes.trim(),
         createdAt: new Date().toISOString(),
+        createdBy: user.uid,
       });
       onCloseForm();
       resetForm();
@@ -179,13 +182,13 @@ const SplitPayments = ({
                     <span className="text-teal-400 font-bold text-sm">
                       {formatCurrency(pay.amount)}
                     </span>
-                    <button
+                    {canManage && <button
                       onClick={() => onDeletePayment(pay.id)}
                       className="p-1.5 text-red-400 hover:bg-red-500/10 rounded transition"
                       title="Excluir pagamento"
                     >
                       <Trash2 size={14} />
-                    </button>
+                    </button>}
                   </div>
                 </div>
               ))}

@@ -59,7 +59,7 @@ const GroupList = ({ groups, user, onSelectGroup }) => {
   };
 
   const handleCreate = async () => {
-    if (!name.trim() || selectedUsers.length < 2) return;
+    if (!name.trim() || selectedUsers.length < 1) return;
     // Build participants list (display names) and memberUids
     const participantNames = selectedUsers.map((uid) => {
       const u = allUsers.find((usr) => usr.uid === uid);
@@ -73,6 +73,7 @@ const GroupList = ({ groups, user, onSelectGroup }) => {
         participants: participantNames,
         memberUids: selectedUsers,
         createdBy: user.uid,
+        ownerUid: user.uid,
         createdAt: new Date().toISOString(),
         monthlyBudget: budget ? parseFloat(budget) : null,
         closedMonths: [],
@@ -272,9 +273,9 @@ const GroupList = ({ groups, user, onSelectGroup }) => {
                     })}
                   </div>
                 )}
-                {selectedUsers.length < 2 && (
+                {selectedUsers.length < 1 && (
                   <p className="text-xs text-amber-400/80 mt-2">
-                    Selecione pelo menos 2 participantes
+                    Selecione pelo menos 1 participante
                   </p>
                 )}
               </div>
@@ -309,7 +310,7 @@ const GroupList = ({ groups, user, onSelectGroup }) => {
                 <button
                   onClick={handleCreate}
                   disabled={
-                    !name.trim() || selectedUsers.length < 2
+                    !name.trim() || selectedUsers.length < 1
                   }
                   className="flex-1 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:hover:bg-indigo-600 text-white font-bold py-3 rounded-lg transition"
                 >

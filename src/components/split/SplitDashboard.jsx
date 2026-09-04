@@ -15,7 +15,7 @@ import {
 import { formatCurrency } from '../../utils/formatCurrency';
 import { CATEGORY_COLORS, getExpenseSplits } from './splitUtils';
 
-const SplitDashboard = ({ group, expenses, payments, debtInfo, onPayDebt, onCloseMonth }) => {
+const SplitDashboard = ({ group, expenses, payments, debtInfo, onPayDebt, onCloseMonth, canManage }) => {
   const now = new Date();
   const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const currentMonthLabel = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
@@ -348,12 +348,12 @@ const SplitDashboard = ({ group, expenses, payments, debtInfo, onPayDebt, onClos
                 <span className="capitalize">{currentMonthLabel}</span> e gere o resumo final
               </p>
             </div>
-            <button
+            {canManage && <button
               onClick={onCloseMonth}
               className="bg-amber-600 hover:bg-amber-500 text-white px-5 py-2.5 rounded-lg font-bold text-sm transition whitespace-nowrap"
             >
               Fechar Mês
-            </button>
+            </button>}
           </div>
         ) : (
           <div className="text-center py-2">

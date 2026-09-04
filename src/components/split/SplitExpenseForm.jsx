@@ -5,7 +5,7 @@ import { Plus, Pencil, X, DollarSign, Percent, SlidersHorizontal } from 'lucide-
 import { SPLIT_CATEGORIES } from './splitUtils';
 import { formatCurrency } from '../../utils/formatCurrency';
 
-const SplitExpenseForm = ({ group, onClose, editingExpense }) => {
+const SplitExpenseForm = ({ group, onClose, editingExpense, user }) => {
   const isEditing = !!editingExpense;
   const todayStr = new Date().toISOString().split('T')[0];
   const participants = group.participants || [];
@@ -100,6 +100,7 @@ const SplitExpenseForm = ({ group, onClose, editingExpense }) => {
         await addDoc(collection(db, 'split_groups', group.id, 'expenses'), {
           ...expenseData,
           createdAt: new Date().toISOString(),
+          createdBy: user.uid,
         });
       }
 

@@ -20,7 +20,7 @@ import {
   ShoppingBag,
 } from 'lucide-react';
 
-const PersonSection = ({ personName, items, color }) => {
+const PersonSection = ({ personName, items, color, tripId, user, canManage }) => {
   const [newItem, setNewItem] = useState('');
   const [newQty, setNewQty] = useState('');
   const [editingId, setEditingId] = useState(null);
@@ -29,13 +29,14 @@ const PersonSection = ({ personName, items, color }) => {
 
   const handleAdd = async () => {
     if (!newItem.trim()) return;
-    await addDoc(collection(db, 'checklist'), {
+    await addDoc(collection(db, 'trips', tripId, 'checklist'), {
       person: personName,
       item: newItem.trim(),
       quantity: newQty.trim() || '1',
       handBag: false,
       suitcase: false,
       createdAt: new Date().toISOString(),
+      createdBy: user.uid,
     });
     setNewItem('');
     setNewQty('');
@@ -46,12 +47,13 @@ const PersonSection = ({ personName, items, color }) => {
   };
 
   const toggleField = async (id, field, currentValue) => {
-    await updateDoc(doc(db, 'checklist', id), { [field]: !currentValue });
+    if (!canManage) return;
+    await updateDoc(doc(db, 'trips', tripId, 'checklist', id), { [field]: !currentValue });
   };
 
   const handleDelete = async (id) => {
     if (confirm('Excluir este item?')) {
-      await deleteDoc(doc(db, 'checklist', id));
+      await deleteDoc(doc(db, 'trips', tripId, 'checklist', id));
     }
   };
 
@@ -69,7 +71,7 @@ const PersonSection = ({ personName, items, color }) => {
 
   const saveEdit = async (id) => {
     if (!editItem.trim()) return;
-    await updateDoc(doc(db, 'checklist', id), {
+    await updateDoc(doc(db, 'trips', tripId, 'checklist', id), {
       item: editItem.trim(),
       quantity: editQty.trim() || '1',
     });
@@ -254,6 +256,7 @@ const PersonSection = ({ personName, items, color }) => {
                   <div className="flex items-center gap-2">
                     {/* Bolsa de mão check */}
                     <button
+                      disabled={!canManage}
                       onClick={() => toggleField(item.id, 'handBag', item.handBag)}
                       className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition ${
                         item.handBag
@@ -268,6 +271,7 @@ const PersonSection = ({ personName, items, color }) => {
 
                     {/* Mala check */}
                     <button
+                      disabled={!canManage}
                       onClick={() => toggleField(item.id, 'suitcase', item.suitcase)}
                       className={`flex items-center gap-1 text-xs px-2 py-1 rounded-md transition ${
                         item.suitcase
@@ -283,7 +287,7 @@ const PersonSection = ({ personName, items, color }) => {
                     <div className="flex-1" />
 
                     {/* Edit / Delete - always visible on mobile */}
-                    <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition">
+                    {canManage && <div className="flex items-center gap-1 sm:opacity-0 sm:group-hover:opacity-100 transition">
                       <button
                         onClick={() => startEdit(item)}
                         className="text-slate-400 hover:text-blue-400 p-1 transition"
@@ -296,7 +300,7 @@ const PersonSection = ({ personName, items, color }) => {
                       >
                         <Trash2 size={14} />
                       </button>
-                    </div>
+                    </div>}
                   </div>
                 </div>
               )}
@@ -308,7 +312,7 @@ const PersonSection = ({ personName, items, color }) => {
   );
 };
 
-const PackingChecklist = ({ items, settings }) => {
+const PackingChecklist = ({ items, settings, tripId, user, canManage }) => {
   const allPacked = (i) => i.handBag && i.suitcase;
 
   const sortItems = (list) =>
@@ -365,6 +369,9 @@ const PackingChecklist = ({ items, settings }) => {
             personName={personName}
             items={sortItems(items.filter((i) => i.person === personName))}
             color={colors[idx % colors.length]}
+            tripId={tripId}
+            user={user}
+            canManage={canManage}
           />
         ))}
         {orderedPersons.length === 0 && (
@@ -373,11 +380,17 @@ const PackingChecklist = ({ items, settings }) => {
               personName={settings.person1}
               items={[]}
               color="teal"
+              tripId={tripId}
+              user={user}
+              canManage={canManage}
             />
             <PersonSection
               personName={settings.person2}
               items={[]}
               color="pink"
+              tripId={tripId}
+              user={user}
+              canManage={canManage}
             />
           </div>
         )}

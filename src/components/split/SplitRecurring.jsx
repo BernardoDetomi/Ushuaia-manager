@@ -14,7 +14,7 @@ import {
 import { formatCurrency } from '../../utils/formatCurrency';
 import { SPLIT_CATEGORIES } from './splitUtils';
 
-const SplitRecurring = ({ group, recurringItems }) => {
+const SplitRecurring = ({ group, recurringItems, user, canManage }) => {
   const [showForm, setShowForm] = useState(false);
   const participants = group.participants || [];
 
@@ -72,6 +72,7 @@ const SplitRecurring = ({ group, recurringItems }) => {
         active: true,
         lastGenerated: null,
         createdAt: new Date().toISOString(),
+        createdBy: user.uid,
       });
       setShowForm(false);
       resetForm();
@@ -82,6 +83,7 @@ const SplitRecurring = ({ group, recurringItems }) => {
   };
 
   const toggleActive = async (item) => {
+    if (!canManage) return;
     try {
       await updateDoc(doc(db, 'split_groups', group.id, 'recurring', item.id), {
         active: !item.active,
@@ -92,6 +94,7 @@ const SplitRecurring = ({ group, recurringItems }) => {
   };
 
   const handleDelete = async (id) => {
+    if (!canManage) return;
     if (confirm('Excluir esta despesa recorrente?')) {
       try {
         await deleteDoc(doc(db, 'split_groups', group.id, 'recurring', id));
@@ -199,20 +202,20 @@ const SplitRecurring = ({ group, recurringItems }) => {
                 </div>
                 <div className="flex items-center gap-3 shrink-0 ml-3">
                   <span className="text-white font-bold">{formatCurrency(item.amount)}</span>
-                  <button
+                  {canManage && <button
                     onClick={() => toggleActive(item)}
                     className="p-1.5 hover:bg-slate-700 rounded transition"
                     title="Pausar recorrência"
                   >
                     <ToggleRight size={22} className="text-teal-400" />
-                  </button>
-                  <button
+                  </button>}
+                  {canManage && <button
                     onClick={() => handleDelete(item.id)}
                     className="p-1.5 text-red-400 hover:bg-red-500/10 rounded transition"
                     title="Excluir"
                   >
                     <Trash2 size={14} />
-                  </button>
+                  </button>}
                 </div>
               </div>
             </div>
@@ -243,19 +246,19 @@ const SplitRecurring = ({ group, recurringItems }) => {
                       </div>
                     </div>
                     <div className="flex items-center gap-2 ml-3">
-                      <button
+                      {canManage && <button
                         onClick={() => toggleActive(item)}
                         className="p-1.5 hover:bg-slate-700 rounded transition"
                         title="Reativar"
                       >
                         <ToggleLeft size={22} className="text-slate-500" />
-                      </button>
-                      <button
+                      </button>}
+                      {canManage && <button
                         onClick={() => handleDelete(item.id)}
                         className="p-1.5 text-red-400 hover:bg-red-500/10 rounded transition"
                       >
                         <Trash2 size={14} />
-                      </button>
+                      </button>}
                     </div>
                   </div>
                 </div>

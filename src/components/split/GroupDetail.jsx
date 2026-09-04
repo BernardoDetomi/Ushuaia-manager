@@ -32,8 +32,10 @@ import SplitExpenseForm from './SplitExpenseForm';
 import SplitExpenseList from './SplitExpenseList';
 import SplitPayments from './SplitPayments';
 import SplitRecurring from './SplitRecurring';
+import AccessManager from '../AccessManager';
 
 const GroupDetail = ({ group, user, settings, onBack }) => {
+  const canManage = (group.ownerUid || group.createdBy) === user.uid;
   const [tab, setTab] = useState('dashboard');
   const [expenses, setExpenses] = useState([]);
   const [payments, setPayments] = useState([]);
@@ -87,7 +89,7 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
 
   // Auto-generate recurring expenses
   useEffect(() => {
-    if (recurringItems.length === 0) return;
+    if (!canManage || recurringItems.length === 0) return;
 
     const now = new Date();
     const currentMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
@@ -119,6 +121,7 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
           recurringId: item.id,
           isRecurring: true,
           createdAt: new Date().toISOString(),
+          createdBy: user.uid,
         });
 
         await updateDoc(doc(db, 'split_groups', group.id, 'recurring', item.id), {
@@ -135,12 +138,14 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
   }, [expenses, payments, group.participants]);
 
   const handleDeleteExpense = async (id) => {
+    if (!canManage) return;
     if (confirm('Excluir esta despesa?')) {
       await deleteDoc(doc(db, 'split_groups', group.id, 'expenses', id));
     }
   };
 
   const handleDeletePayment = async (id) => {
+    if (!canManage) return;
     if (confirm('Excluir este pagamento?')) {
       await deleteDoc(doc(db, 'split_groups', group.id, 'payments', id));
     }
@@ -152,6 +157,7 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
   };
 
   const handleCloseMonth = async () => {
+    if (!canManage) return;
     const now = new Date();
     const monthStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
     const monthLabel = now.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' });
@@ -167,7 +173,7 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
 
   const handleSaveGroupSettings = async () => {
     const clean = gsParticipants.filter((p) => p.trim()).map((p) => p.trim());
-    if (!gsName.trim() || clean.length < 2) return;
+    if (!canManage || !gsName.trim() || clean.length < 1) return;
 
     try {
       await updateDoc(doc(db, 'split_groups', group.id), {
@@ -207,6 +213,7 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
   };
 
   const handleDeleteGroup = async () => {
+    if (!canManage) return;
     if (
       confirm(
         'Tem certeza que deseja excluir este grupo? Todas as despesas e pagamentos serão perdidos.'
@@ -265,7 +272,7 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
               </div>
             </div>
           </div>
-          <button
+          {canManage && <button
             onClick={() => {
               setGsName(group.name);
               setGsParticipants([...(group.participants || [])]);
@@ -276,7 +283,7 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
             title="Configurações do grupo"
           >
             <Settings size={20} />
-          </button>
+          </button>}
         </div>
       </div>
 
@@ -332,6 +339,7 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
           debtInfo={debtInfo}
           onPayDebt={handlePayDebt}
           onCloseMonth={handleCloseMonth}
+          canManage={canManage}
         />
       )}
       {tab === 'expenses' && (
@@ -340,9 +348,12 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
           group={group}
           onDelete={handleDeleteExpense}
           onEdit={(exp) => {
-            setEditingExpense(exp);
-            setShowExpenseForm(true);
+            if (canManage) {
+              setEditingExpense(exp);
+              setShowExpenseForm(true);
+            }
           }}
+          canManage={canManage}
         />
       )}
       {tab === 'payments' && (
@@ -352,22 +363,25 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
           debtInfo={debtInfo}
           onPayDebt={handlePayDebt}
           onDeletePayment={handleDeletePayment}
+          canManage={canManage}
           showForm={showPaymentForm}
           onCloseForm={() => {
             setShowPaymentForm(false);
             setPaymentPreset(null);
           }}
           preset={paymentPreset}
+          user={user}
         />
       )}
       {tab === 'recurring' && (
-        <SplitRecurring group={group} recurringItems={recurringItems} />
+        <SplitRecurring group={group} recurringItems={recurringItems} user={user} canManage={canManage} />
       )}
 
       {/* Expense Form Modal */}
       {showExpenseForm && (
         <SplitExpenseForm
           group={group}
+          user={user}
           onClose={() => {
             setShowExpenseForm(false);
             setEditingExpense(null);
@@ -415,7 +429,7 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
                           setGsParticipants(u);
                         }}
                       />
-                      {gsParticipants.length > 2 && (
+                      {false && (
                         <button
                           onClick={() =>
                             setGsParticipants(gsParticipants.filter((_, i) => i !== idx))
@@ -428,12 +442,12 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
                     </div>
                   ))}
                 </div>
-                <button
+                {false && <button
                   onClick={() => setGsParticipants([...gsParticipants, ''])}
                   className="mt-2 text-indigo-400 hover:text-indigo-300 text-sm font-medium flex items-center gap-1"
                 >
                   <UserPlus size={14} /> Adicionar participante
-                </button>
+                </button>}
               </div>
 
               <div>
@@ -448,30 +462,7 @@ const GroupDetail = ({ group, user, settings, onBack }) => {
                 />
               </div>
 
-              {/* Invite user by email */}
-              <div className="bg-slate-900/50 p-4 rounded-lg border border-slate-700">
-                <label className="block text-sm text-slate-400 mb-2 flex items-center gap-1.5">
-                  <Share2 size={14} /> Compartilhar Grupo
-                </label>
-                <p className="text-xs text-slate-500 mb-3">
-                  Adicione outro usuário do app pelo email para que ele veja este grupo.
-                </p>
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    className="flex-1 bg-slate-800 border border-slate-600 rounded-lg p-2.5 text-white text-sm focus:border-indigo-500 outline-none"
-                    placeholder="email@exemplo.com"
-                    value={gsInviteEmail}
-                    onChange={(e) => setGsInviteEmail(e.target.value)}
-                  />
-                  <button
-                    onClick={handleInviteUser}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white px-4 rounded-lg text-sm font-medium transition"
-                  >
-                    Convidar
-                  </button>
-                </div>
-              </div>
+              <AccessManager resourceType="split" resource={group} user={user} accent="indigo" />
 
               <div className="pt-2 flex gap-3">
                 <button

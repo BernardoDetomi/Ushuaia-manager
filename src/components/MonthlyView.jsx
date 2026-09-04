@@ -4,7 +4,7 @@ import { db } from '../config/firebase';
 import { Calendar, CheckCircle, Circle, User, Users, ArrowRightLeft } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 
-const MonthlyView = ({ expenses, settings, collectionName = 'expenses' }) => {
+const MonthlyView = ({ expenses, settings, tripId, canManage }) => {
   const [expandedMonths, setExpandedMonths] = useState({});
 
   const toggleMonth = (monthKey) => {
@@ -12,6 +12,7 @@ const MonthlyView = ({ expenses, settings, collectionName = 'expenses' }) => {
   };
 
   const togglePayment = async (expenseId, key, currentPaidMap) => {
+    if (!canManage) return;
     // key format: "installmentIndex_person1" or "installmentIndex_person2"
     const newPaidMap = { ...currentPaidMap };
     if (newPaidMap[key]) {
@@ -21,7 +22,7 @@ const MonthlyView = ({ expenses, settings, collectionName = 'expenses' }) => {
     }
 
     try {
-      const docRef = doc(db, collectionName, expenseId);
+      const docRef = doc(db, 'trips', tripId, 'expenses', expenseId);
       await updateDoc(docRef, { parcelas_pagas_v2: newPaidMap });
     } catch (err) {
       console.error('Error updating payment:', err);

@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { Trash2, CreditCard, Pencil } from 'lucide-react';
 import { formatCurrency } from '../utils/formatCurrency';
 
-const ExpenseList = ({ expenses, onDelete, onEdit, settings }) => {
+const ExpenseList = ({ expenses, onDelete, onEdit, settings, canManage = false }) => {
   const [filter, setFilter] = useState('todos');
 
   const filteredExpenses = expenses.filter((exp) => {
@@ -77,7 +77,7 @@ const ExpenseList = ({ expenses, onDelete, onEdit, settings }) => {
                     {formatCurrency(expense.valor_total)}
                   </td>
                   <td className="px-6 py-4 text-center">
-                    <div className="flex items-center justify-center gap-1">
+                    {canManage ? <div className="flex items-center justify-center gap-1">
                       <button
                         onClick={() => onEdit(expense)}
                         className="text-yellow-400 hover:text-yellow-300 hover:bg-yellow-500/10 p-1.5 rounded-full transition"
@@ -92,7 +92,7 @@ const ExpenseList = ({ expenses, onDelete, onEdit, settings }) => {
                       >
                         <Trash2 size={16} />
                       </button>
-                    </div>
+                    </div> : <span className="text-xs text-slate-600">Somente líder</span>}
                   </td>
                 </tr>
               ))
